@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Cadastro - PrevsImob">
+  <title>Cadastro - PrevsImob</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Poppins:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .signup-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      padding: 2rem 0;
+    }
+
+    .signup-container {
+      background: white;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      padding: 3rem;
+      width: 100%;
+      max-width: 450px;
+    }
+
+    .signup-container h2 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+      color: var(--text-dark);
+    }
+
+    .signup-container p {
+      text-align: center;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+
+    .signup-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-group label {
+      font-weight: 500;
+      color: var(--text-dark);
+      font-size: 0.95rem;
+    }
+
+    .signup-form input {
+      padding: 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 1rem;
+      color: var(--text-dark);
+      transition: var(--transition);
+    }
+
+    .signup-form input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .signup-form input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.1);
+    }
+
+    .password-strength {
+      font-size: 0.85rem;
+      margin-top: 0.3rem;
+      padding: 0.5rem;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .strength-weak {
+      background: #fee;
+      color: #c00;
+    }
+
+    .strength-medium {
+      background: #ffe;
+      color: #880;
+    }
+
+    .strength-strong {
+      background: #efe;
+      color: #080;
+    }
+
+    .signup-button {
+      padding: 1rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: var(--transition);
+      margin-top: 0.5rem;
+    }
+
+    .signup-button:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+
+    .signup-button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .signup-footer {
+      text-align: center;
+      margin-top: 2rem;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .signup-footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .signup-footer a:hover {
+      text-decoration: underline;
+    }
+
+    .terms {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .terms label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+    }
+
+    .terms input {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="logo-wrapper">
+        <a class="logo" href="index.html" aria-label="PrevsImob - Página inicial">
+          <i class="fas fa-building"></i>
+          <span>PrevsImob</span>
+        </a>
+      </div>
+      <nav aria-label="Navegação principal">
+        <ul class="nav-list">
+          <li><a href="index.html">Início</a></li>
+          <li><a href="servicos.html">Serviços</a></li>
+          <li><a href="propriedades.html">Propriedades</a></li>
+          <li><a href="prever.html">Prever Imóvel</a></li>
+          <li><a href="index.html#depoimentos">Depoimentos</a></li>
+          <li><a href="sobre.html">Sobre</a></li>
+          <li><a href="contato.html">Contato</a></li>
+        </ul>
+      </nav>
+      <a href="login.html" class="btn-login">Faça Login</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="signup-wrapper">
+      <div class="signup-container">
+        <h2>Criar Conta</h2>
+        <p>Cadastre-se e comece a explorar imóveis incríveis</p>
+        
+        <form class="signup-form" id="signupForm">
+          <div class="form-group">
+            <label for="nome">Nome Completo</label>
+            <input type="text" id="nome" placeholder="Seu nome completo" required>
+          </div>
+
+          <div class="form-group">
+            <label for="email">E-mail</label>
+            <input type="email" id="email" placeholder="seu@email.com" required>
+          </div>
+
+          <div class="form-group">
+            <label for="telefone">Telefone (opcional)</label>
+            <input type="tel" id="telefone" placeholder="(11) 98765-4321">
+          </div>
+
+          <div class="form-group">
+            <label for="senha">Senha</label>
+            <input type="password" id="senha" placeholder="Crie uma senha forte" required>
+            <div class="password-strength" id="strengthIndicator"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="confirmaSenha">Confirmar Senha</label>
+            <input type="password" id="confirmaSenha" placeholder="Confirme sua senha" required>
+          </div>
+
+          <div class="terms">
+            <label>
+              <input type="checkbox" id="termos" required>
+              Concordo com os <a href="#" style="color: var(--primary);">Termos de Serviço</a> e <a href="#" style="color: var(--primary);">Política de Privacidade</a>
+            </label>
+          </div>
+
+          <button type="submit" class="signup-button">Criar Conta</button>
+        </form>
+
+        <div class="signup-footer">
+          <p>Já tem uma conta? <a href="login.html">Faça login aqui</a></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h4>PrevsImob</h4>
+          <p>Conectando você ao imóvel perfeito com segurança e transparência.</p>
+        </div>
+        <div class="footer-section">
+          <h4>Links Rápidos</h4>
+          <ul>
+            <li><a href="index.html">Início</a></li>
+            <li><a href="servicos.html">Serviços</a></li>
+            <li><a href="propriedades.html">Propriedades</a></li>
+            <li><a href="sobre.html">Sobre</a></li>
+          </ul>
+        </div>
+        <div class="footer-section">
+          <h4>Contato</h4>
+          <p>📞 (11) 1234-5678</p>
+          <p>📧 contato@prevsimob.com.br</p>
+        </div>
+        <div class="footer-section">
+          <h4>Redes Sociais</h4>
+          <div class="social-links">
+            <a href="#" title="Facebook"><i class="fab fa-facebook"></i></a>
+            <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
+            <a href="#" title="LinkedIn"><i class="fab fa-linkedin"></i></a>
+          </div>
+        </div>
+      </div>
+      <small>&copy; 2024 PrevsImob. Todos os direitos reservados.</small>
+    </div>
+  </footer>
+
+  <script>
+    // Verificador de força de senha
+    const senhaInput = document.getElementById('senha');
+    const strengthIndicator = document.getElementById('strengthIndicator');
+
+    senhaInput.addEventListener('input', function() {
+      const senha = this.value;
+      let force = 0;
+      let text = '';
+      let className = '';
+
+      if (senha.length >= 8) force++;
+      if (senha.length >= 12) force++;
+      if (/[a-z]/.test(senha) && /[A-Z]/.test(senha)) force++;
+      if (/[0-9]/.test(senha)) force++;
+      if (/[^a-zA-Z0-9]/.test(senha)) force++;
+
+      if (força === 0) {
+        text = '';
+        className = '';
+      } else if (force <= 2) {
+        text = 'Senha fraca';
+        className = 'strength-weak';
+      } else if (force <= 3) {
+        text = 'Senha média';
+        className = 'strength-medium';
+      } else {
+        text = 'Senha forte';
+        className = 'strength-strong';
+      }
+
+      strengthIndicator.textContent = text;
+      strengthIndicator.className = 'password-strength ' + className;
+    });
+
+    // Validação e submissão do formulário
+    document.getElementById('signupForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const nome = document.getElementById('nome').value;
+      const email = document.getElementById('email').value;
+      const senha = document.getElementById('senha').value;
+      const confirmaSenha = document.getElementById('confirmaSenha').value;
+      const termos = document.getElementById('termos').checked;
+
+      // Validações
+      if (!nome.trim()) {
+        alert('Por favor, insira seu nome completo');
+        return;
+      }
+
+      if (!email.includes('@')) {
+        alert('Por favor, insira um email válido');
+        return;
+      }
+
+      if (senha.length < 6) {
+        alert('A senha deve ter pelo menos 6 caracteres');
+        return;
+      }
+
+      if (senha !== confirmaSenha) {
+        alert('As senhas não conferem');
+        return;
+      }
+
+      if (!termos) {
+        alert('Por favor, aceite os termos de serviço');
+        return;
+      }
+
+      // Salvar no localStorage (em produção seria uma API)
+      const usuario = {
+        nome: nome,
+        email: email,
+        telefone: document.getElementById('telefone').value,
+        dataCadastro: new Date().toLocaleDateString('pt-BR')
+      };
+
+      localStorage.setItem('usuarioCadastrado', JSON.stringify(usuario));
+      localStorage.setItem('userLogado', email);
+
+      alert(`Bem-vindo ${nome}! Sua conta foi criada com sucesso!`);
+      window.location.href = 'index.html';
+    });
+  </script>
+
+  <script src="app.js"></script>
+</body>
+</html>

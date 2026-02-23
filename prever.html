@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PrevsImob — Simule e preveja o valor de imóveis com nossa ferramenta inteligente.">
+  <title>Prever Imóvel - PrevsImob</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Poppins:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="logo-wrapper">
+        <a class="logo" href="index.html" aria-label="PrevsImob - Página inicial">
+          <i class="fas fa-building"></i>
+          <span>PrevsImob</span>
+        </a>
+      </div>
+      <nav aria-label="Navegação principal">
+        <ul class="nav-list">
+          <li><a href="index.html">Início</a></li>
+          <li><a href="servicos.html">Serviços</a></li>
+          <li><a href="propriedades.html">Propriedades</a></li>
+          <li><a href="prever.html" class="active">Prever Imóvel</a></li>
+          <li><a href="index.html#depoimentos">Depoimentos</a></li>
+          <li><a href="sobre.html">Sobre</a></li>
+          <li><a href="contato.html">Contato</a></li>
+        </ul>
+      </nav>
+      <a href="login.html" class="btn-login">Faça Login</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="prever-hero panel">
+      <div class="container prever-hero-inner reveal">
+        <div class="hero-content">
+          <h1>Descubra o Valor do Seu Imóvel</h1>
+          <p>Utilize nossa ferramenta inteligente para prever e simular o valor do seu imóvel em tempo real</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="prever-simulador" class="prever-simulador container panel reveal">
+      <div class="simulador-wrapper">
+        <div class="simulador-form">
+          <div class="section-header">
+            <h2>Simulador de Preço</h2>
+            <p>Preencha as informações e descubra o valor estimado</p>
+          </div>
+
+          <form id="preverForm" class="form-prever" role="form" aria-label="Simulador de preço de imóvel">
+            <!-- Localização -->
+            <div class="form-group">
+              <label for="cidade">Cidade</label>
+              <select id="cidade" required aria-label="Selecione a cidade">
+                <option value="">Selecione a cidade</option>
+                <option value="sao-paulo">São Paulo, SP</option>
+                <option value="campinas">Campinas, SP</option>
+                <option value="ibirapuera">Ibirapuera, SP</option>
+                <option value="itatiba">Itatiba, SP</option>
+                <option value="outras">Outra localização</option>
+              </select>
+            </div>
+
+            <!-- Tipo de Imóvel -->
+            <div class="form-group">
+              <label for="tipoImovel">Tipo de Imóvel</label>
+              <select id="tipoImovel" required aria-label="Selecione o tipo de imóvel">
+                <option value="">Selecione o tipo</option>
+                <option value="apartamento">Apartamento</option>
+                <option value="casa">Casa</option>
+                <option value="loft">Loft</option>
+                <option value="penthouse">Penthouse</option>
+                <option value="chacara">Chácara</option>
+                <option value="comercial">Comercial</option>
+              </select>
+            </div>
+
+            <!-- Finalidade -->
+            <div class="form-group">
+              <label for="finalidade">Finalidade</label>
+              <select id="finalidade" required aria-label="Selecione a finalidade">
+                <option value="">Selecione a finalidade</option>
+                <option value="compra">Compra/Venda</option>
+                <option value="aluguel">Aluguel</option>
+              </select>
+            </div>
+
+            <!-- Área -->
+            <div class="form-group">
+              <label for="area">Área (m²)</label>
+              <input type="number" id="area" placeholder="Ex: 120" min="10" max="10000" step="0.1" required aria-label="Digite a área do imóvel">
+            </div>
+
+            <!-- Quartos -->
+            <div class="form-group">
+              <label for="quartos">Quartos</label>
+              <select id="quartos" required aria-label="Selecione o número de quartos">
+                <option value="">Selecione</option>
+                <option value="1">1 Quarto</option>
+                <option value="2">2 Quartos</option>
+                <option value="3">3 Quartos</option>
+                <option value="4">4 Quartos</option>
+                <option value="5">5+ Quartos</option>
+              </select>
+            </div>
+
+            <!-- Banheiros -->
+            <div class="form-group">
+              <label for="banheiros">Banheiros</label>
+              <select id="banheiros" required aria-label="Selecione o número de banheiros">
+                <option value="">Selecione</option>
+                <option value="1">1 Banheiro</option>
+                <option value="2">2 Banheiros</option>
+                <option value="3">3 Banheiros</option>
+                <option value="4">4+ Banheiros</option>
+              </select>
+            </div>
+
+            <!-- Garagem -->
+            <div class="form-group">
+              <label for="garagem">Vagas de Garagem</label>
+              <select id="garagem" required aria-label="Selecione o número de vagas">
+                <option value="0">0 Vagas</option>
+                <option value="1">1 Vaga</option>
+                <option value="2">2 Vagas</option>
+                <option value="3">3 Vagas</option>
+                <option value="4">4+ Vagas</option>
+              </select>
+            </div>
+
+            <!-- Idade do Imóvel -->
+            <div class="form-group">
+              <label for="idade">Idade do Imóvel (anos)</label>
+              <select id="idade" required aria-label="Selecione a idade do imóvel">
+                <option value="">Selecione</option>
+                <option value="novo">Novo (0-2 anos)</option>
+                <option value="recente">Recente (2-5 anos)</option>
+                <option value="intermediario">Intermediário (5-15 anos)</option>
+                <option value="velho">Antigo (15+ anos)</option>
+              </select>
+            </div>
+
+            <!-- Conservação -->
+            <div class="form-group">
+              <label for="conservacao">Estado de Conservação</label>
+              <select id="conservacao" required aria-label="Selecione o estado de conservação">
+                <option value="">Selecione</option>
+                <option value="excelente">Excelente</option>
+                <option value="bom">Bom</option>
+                <option value="regular">Regular</option>
+                <option value="ruim">Precisa Reforma</option>
+              </select>
+            </div>
+
+            <!-- Amenidades -->
+            <div class="form-group amenidades-group">
+              <label>Amenidades</label>
+              <div class="checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="piscina" value="piscina" aria-label="Possui piscina">
+                  <span>Piscina</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="academia" value="academia" aria-label="Possui academia">
+                  <span>Academia</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="churrasqueira" value="churrasqueira" aria-label="Possui churrasqueira">
+                  <span>Churrasqueira</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="area_lazer" value="area_lazer" aria-label="Possui área de lazer">
+                  <span>Área de Lazer</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="smart_home" value="smart_home" aria-label="Possui smart home">
+                  <span>Smart Home</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="seguranca_24h" value="seguranca_24h" aria-label="Possui segurança 24h">
+                  <span>Segurança 24h</span>
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary btn-large">
+              <i class="fas fa-calculator"></i> Calcular Preço
+            </button>
+          </form>
+        </div>
+
+        <!-- Resultado -->
+        <div class="simulador-resultado" id="resultado" style="display: none;">
+          <div class="resultado-card">
+            <div class="resultado-header">
+              <h3>Valor Estimado</h3>
+              <button type="button" class="btn-close" id="btnFecharResultado" aria-label="Fechar resultado">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+
+            <div class="resultado-content">
+              <div class="valor-principal">
+                <span class="label">Valor Estimado</span>
+                <div class="preco-box">
+                  <span id="valorEstimado" class="preco-grande">R$ 0,00</span>
+                </div>
+              </div>
+
+              <div class="resultado-detalhes">
+                <h4>Detalhes da Simulação</h4>
+                <div class="detalhes-grid">
+                  <div class="detalhe-item">
+                    <span class="detalhe-label">Localização</span>
+                    <span id="detalheCidade" class="detalhe-valor">-</span>
+                  </div>
+                  <div class="detalhe-item">
+                    <span class="detalhe-label">Tipo de Imóvel</span>
+                    <span id="detalheTipo" class="detalhe-valor">-</span>
+                  </div>
+                  <div class="detalhe-item">
+                    <span class="detalhe-label">Área Total</span>
+                    <span id="detalheArea" class="detalhe-valor">-</span>
+                  </div>
+                  <div class="detalhe-item">
+                    <span class="detalhe-label">Preço por m²</span>
+                    <span id="detalhePrecoPorM2" class="detalhe-valor">-</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="resultado-info">
+                <div class="info-box">
+                  <i class="fas fa-info-circle"></i>
+                  <p><strong>Observação:</strong> Este é um valor estimado baseado em dados de mercado. Para uma avaliação mais precisa, entre em contato com nossos especialistas.</p>
+                </div>
+              </div>
+
+              <div class="resultado-acoes">
+                <button class="btn-primary" id="btnConsultar">
+                  <i class="fas fa-phone"></i> Falar com Especialista
+                </button>
+                <button class="btn-secondary" id="btnNovaSimulacao">
+                  <i class="fas fa-redo"></i> Nova Simulação
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="faixa-preco-box">
+            <h4>Faixa de Preço</h4>
+            <div class="faixa-preco">
+              <div class="preco-min">
+                <span class="label">Valor Mínimo</span>
+                <span id="valorMinimo" class="valor">R$ 0,00</span>
+              </div>
+              <div class="preco-chart">
+                <div class="barra-preco">
+                  <div id="indicadorPreco" class="indicador" style="left: 50%"></div>
+                </div>
+              </div>
+              <div class="preco-max">
+                <span class="label">Valor Máximo</span>
+                <span id="valorMaximo" class="valor">R$ 0,00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção de Informações -->
+    <section class="prever-info container panel reveal">
+      <div class="section-header">
+        <h2>Como Funciona Nossa Previsão</h2>
+        <p>Conheça a metodologia por trás de nossos cálculos</p>
+      </div>
+
+      <div class="info-cards">
+        <div class="info-card">
+          <div class="info-icon">
+            <i class="fas fa-database"></i>
+          </div>
+          <h3>Dados de Mercado</h3>
+          <p>Utilizamos um banco de dados atualizado com informações de mercado imobiliário em tempo real.</p>
+        </div>
+
+        <div class="info-card">
+          <div class="info-icon">
+            <i class="fas fa-brain"></i>
+          </div>
+          <h3>Inteligência Artificial</h3>
+          <p>Algoritmos avançados analisam múltiplos fatores para gerar estimativas precisas.</p>
+        </div>
+
+        <div class="info-card">
+          <div class="info-icon">
+            <i class="fas fa-map-pin"></i>
+          </div>
+          <h3>Localização</h3>
+          <p>A posição geográfica é analisada considerando infraestrutura, segurança e proximidade de comércios.</p>
+        </div>
+
+        <div class="info-card">
+          <div class="info-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <h3>Precisão</h3>
+          <p>Nossas estimativas têm margem de erro menor que 5% comparadas ao valor real de mercado.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="prever-cta panel">
+      <div class="container cta-content reveal">
+        <h2>Pronto para Vender ou Alugar seu Imóvel?</h2>
+        <p>Conte com nossos especialistas para obter o melhor valor</p>
+        <a href="contato.html" class="btn-primary btn-large">Entre em Contato</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h4>PrevsImob</h4>
+          <p>Conectando pessoas a imóveis.</p>
+        </div>
+        <div class="footer-section">
+          <h4>Links</h4>
+          <ul>
+            <li><a href="propriedades.html">Propriedades</a></li>
+            <li><a href="sobre.html">Sobre nós</a></li>
+            <li><a href="contato.html">Contato</a></li>
+          </ul>
+        </div>
+        <div class="footer-section">
+          <h4>Redes Sociais</h4>
+          <div class="social-links">
+            <a href="#"><i class="fab fa-facebook"></i></a>
+            <a href="#"><i class="fab fa-instagram"></i></a>
+            <a href="#"><i class="fab fa-linkedin"></i></a>
+          </div>
+        </div>
+      </div>
+      <small>© <span id="year">2025</span> PrevsImob. Todos os direitos reservados.</small>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  <script src="prever.js"></script>
+</body>
+</html>

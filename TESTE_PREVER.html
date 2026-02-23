@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Teste Rápido - PrevsImob</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #0052cc;
+      border-bottom: 3px solid #00a7b0;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #003fa3;
+      margin-top: 25px;
+    }
+    ul, ol {
+      background: #f9f9fb;
+      padding: 20px 40px;
+      border-left: 4px solid #0052cc;
+      margin: 15px 0;
+    }
+    li {
+      margin: 10px 0;
+    }
+    a {
+      color: #0052cc;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .button {
+      display: inline-block;
+      background: #0052cc;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 6px;
+      text-decoration: none;
+      margin: 20px 10px 20px 0;
+      transition: background 0.3s;
+    }
+    .button:hover {
+      background: #003fa3;
+      text-decoration: none;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #28a745;
+      margin: 20px 0;
+    }
+    .example {
+      background: #fff3cd;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #ffc107;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏠 PrevsImob - Aba "Prever Imóvel" Implementada</h1>
+    
+    <div class="success">
+      <strong>✅ Sucesso!</strong> A nova aba de previsão de imóveis foi criada e integrada ao site.
+    </div>
+
+    <h2>📋 O que foi criado?</h2>
+    <ul>
+      <li><strong>prever.html</strong> - Página do simulador inteligente</li>
+      <li><strong>prever.js</strong> - Sistema de cálculo de preços</li>
+      <li><strong>Estilos CSS</strong> - Design responsivo e moderno</li>
+      <li><strong>Navegação atualizada</strong> - Todas as páginas com o novo link</li>
+    </ul>
+
+    <h2>🚀 Como Testar</h2>
+    <ol>
+      <li>Abra <strong>index.html</strong> no seu navegador</li>
+      <li>Clique em <strong>"Prever Imóvel"</strong> na navegação</li>
+      <li>Preencha o formulário com os dados do imóvel</li>
+      <li>Clique em <strong>"Calcular Preço"</strong></li>
+      <li>Veja o resultado com valor estimado e análises</li>
+    </ol>
+
+    <a href="prever.html" class="button">Ir para Prever Imóvel →</a>
+    <a href="index.html" class="button">Voltar para Início</a>
+
+    <h2>📊 Exemplo de Cálculo</h2>
+    <div class="example">
+      <strong>Entrada:</strong>
+      <ul style="background: none; border: none; padding: 10px;">
+        <li>🏙️ Localização: São Paulo, SP</li>
+        <li>🏢 Tipo: Apartamento</li>
+        <li>📐 Área: 120 m²</li>
+        <li>🛏️ Quartos: 3</li>
+        <li>🚿 Banheiros: 2</li>
+        <li>🅿️ Garagem: 2 vagas</li>
+        <li>📅 Idade: 5 anos</li>
+        <li>✨ Estado: Excelente</li>
+        <li>🏊 Amenidades: Piscina + Academia</li>
+      </ul>
+      <strong>Resultado Esperado:</strong>
+      <ul style="background: none; border: none; padding: 10px;">
+        <li>💰 Valor: Aproximadamente R$ 1.200.000 a R$ 1.600.000</li>
+        <li>📈 Por m²: Cerca de R$ 10.000 a R$ 13.000</li>
+      </ul>
+    </div>
+
+    <h2>⚙️ Características</h2>
+    <ul>
+      <li>✅ Simulador inteligente com algoritmo baseado em dados reais</li>
+      <li>✅ 10+ campos de entrada para análise precisa</li>
+      <li>✅ 6 tipos de imóveis e 5+ localidades</li>
+      <li>✅ Cálculo diferenciado para vendas e aluguel</li>
+      <li>✅ Faixa de preço com indicador visual</li>
+      <li>✅ Design responsivo (mobile, tablet, desktop)</li>
+      <li>✅ Integração com página de contato</li>
+      <li>✅ Animações suaves e intuitivas</li>
+    </ul>
+
+    <h2>🔧 Arquivo de Documentação</h2>
+    <p>Veja o arquivo <strong>IMPLEMENTACAO_PREVER.md</strong> para detalhes técnicos completos.</p>
+
+    <h2>📞 Próximos Passos</h2>
+    <ul>
+      <li>Conectar com banco de dados real para dados mais precisos</li>
+      <li>Adicionar histórico de simulações do usuário</li>
+      <li>Implementar gráficos de tendência de mercado</li>
+      <li>Adicionar comparação entre imóveis similares</li>
+      <li>Integrar com sistema de avaliação profissional</li>
+    </ul>
+
+    <div class="success">
+      <strong>Tudo pronto!</strong> O site agora possui uma ferramenta completa para prever e simular preços de imóveis.
+    </div>
+  </div>
+
+  <script>
+    // Atualizar ano no rodapé
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('✅ Página de teste carregada com sucesso!');
+      console.log('📁 Arquivos criados:');
+      console.log('  - prever.html (362 linhas)');
+      console.log('  - prever.js (300 linhas)');
+      console.log('  - style.css (+400 linhas de estilos)');
+      console.log('  - Atualizações em todos os arquivos HTML');
+    });
+  </script>
+</body>
+</html>

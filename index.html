@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PrevsImob — Encontre imóveis para comprar ou alugar com confiança e praticidade.">
+  <title>PrevsImob</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Poppins:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="logo-wrapper">
+        <a class="logo" href="#" aria-label="PrevsImob - Página inicial">
+          <i class="fas fa-building"></i>
+          <span>PrevsImob</span>
+        </a>
+      </div>
+      <nav aria-label="Navegação principal">
+        <ul class="nav-list">
+          <li><a href="index.html">Início</a></li>
+          <li><a href="servicos.html">Serviços</a></li>
+          <li><a href="propriedades.html">Propriedades</a></li>
+          <li><a href="prever.html">Prever Imóvel</a></li>
+          <li><a href="index.html#depoimentos">Depoimentos</a></li>
+          <li><a href="sobre.html">Sobre</a></li>
+          <li><a href="contato.html">Contato</a></li>
+        </ul>
+      </nav>
+      <a href="login.html" class="btn-login">Faça Login</a>
+    </div>
+  </header>
+
+  <main>
+    <section id="inicio" class="hero panel">
+      <div class="container hero-inner reveal">
+        <div class="hero-content">
+          <h1>Encontre o imóvel dos seus sonhos</h1>
+          <p>Somos uma imobiliária especializada em conectar você ao imóvel perfeito. Com segurança, transparência e excelente atendimento.</p>
+          <form id="searchForm" class="search-form" role="search" aria-label="Buscar imóveis">
+            <div class="search-group">
+              <input id="q" type="search" placeholder="Digite cidade, bairro ou rua" aria-label="Pesquisar local">
+              <i class="fas fa-search"></i>
+            </div>
+            <select id="typeFilter" aria-label="Tipo de imóvel">
+              <option value="all">Todos os tipos</option>
+              <option value="house">Casas</option>
+              <option value="apartment">Apartamentos</option>
+              <option value="lot">Lotes</option>
+            </select>
+            <select id="purposeFilter" aria-label="Finalidade">
+              <option value="all">Comprar / Alugar</option>
+              <option value="sale">Comprar</option>
+              <option value="rent">Alugar</option>
+            </select>
+            <button type="submit" class="btn-primary"><i class="fas fa-search"></i> Buscar</button>
+          </form>
+          <div class="hero-stats">
+            <div class="stat-item">
+              <strong>500+</strong>
+              <span>Imóveis</span>
+            </div>
+            <div class="stat-item">
+              <strong>2.5K+</strong>
+              <span>Clientes</span>
+            </div>
+            <div class="stat-item">
+              <strong>15+</strong>
+              <span>Anos</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="servicos" class="servicos-section container panel reveal">
+      <div class="section-header">
+        <h2>Nossos Serviços</h2>
+        <p>Soluções completas para suas necessidades imobiliárias</p>
+      </div>
+      <div class="servicos-grid">
+        <div class="servico-card">
+          <div class="servico-icon">
+            <i class="fas fa-home"></i>
+          </div>
+          <h3>Venda de Imóveis</h3>
+          <p>Venda rápida e segura do seu imóvel com melhor preço de mercado</p>
+        </div>
+        <div class="servico-card">
+          <div class="servico-icon">
+            <i class="fas fa-key"></i>
+          </div>
+          <h3>Aluguel de Imóveis</h3>
+          <p>Encontre o imóvel perfeito para alugar na melhor localização</p>
+        </div>
+        <div class="servico-card">
+          <div class="servico-icon">
+            <i class="fas fa-chart-line"></i>
+          </div>
+          <h3>Investimentos</h3>
+          <p>Oportunidades de investimento imobiliário com alto retorno</p>
+        </div>
+        <div class="servico-card">
+          <div class="servico-icon">
+            <i class="fas fa-handshake"></i>
+          </div>
+          <h3>Consultoria</h3>
+          <p>Assessoria especializada para todas as suas decisões imobiliárias</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="destaques" class="listagem container panel" aria-label="Listagem de imóveis em destaque">
+      <div class="section-header">
+        <h2>Propriedades em Destaque</h2>
+        <p>Conheça as melhores oportunidades do momento</p>
+        <div class="filter-controls">
+          <select id="sort" aria-label="Ordenar imóveis" class="sort-select">
+            <option value="relevance">Mais relevantes</option>
+            <option value="price_asc">Menor preço</option>
+            <option value="price_desc">Maior preço</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="properties" class="cards-grid reveal" aria-live="polite">
+        <!-- Cards serão renderizados por JS -->
+      </div>
+    </section>
+
+    <section id="depoimentos" class="depoimentos-section container panel reveal">
+      <div class="section-header">
+        <h2>O Que Nossos Clientes Dizem</h2>
+        <p>Histórias de sucesso de quem encontrou seu imóvel ideal</p>
+      </div>
+      <div class="depoimentos-grid">
+        <div class="depoimento-card">
+          <div class="stars">
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+          </div>
+          <p class="depoimento-texto">"Encontrei meu apartamento dos sonhos através da PrevsImob. O atendimento foi impecável e o processo muito rápido."</p>
+          <div class="depoimento-autor">
+            <div class="autor-avatar">MC</div>
+            <div>
+              <strong>Marina Costa</strong>
+              <span>Cliente desde 2023</span>
+            </div>
+          </div>
+        </div>
+        <div class="depoimento-card">
+          <div class="stars">
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+          </div>
+          <p class="depoimento-texto">"Profissionais extremamente competentes. Venderam minha casa em tempo recorde e pelo melhor preço do mercado."</p>
+          <div class="depoimento-autor">
+            <div class="autor-avatar">JR</div>
+            <div>
+              <strong>João Ribeiro</strong>
+              <span>Cliente desde 2022</span>
+            </div>
+          </div>
+        </div>
+        <div class="depoimento-card">
+          <div class="stars">
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+          </div>
+          <p class="depoimento-texto">"A melhor experiência em compra de imóvel que tive. Recomendo a PrevsImob para todos meus amigos e familiares."</p>
+          <div class="depoimento-autor">
+            <div class="autor-avatar">AS</div>
+            <div>
+              <strong>Ana Silva</strong>
+              <span>Cliente desde 2024</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="quem-somos" class="sobre container panel reveal">
+      <div class="section-header">
+        <h2>Sobre a PrevsImob</h2>
+        <p>Conheça a história e valores da nossa empresa</p>
+      </div>
+      <div class="sobre-content">
+        <div class="sobre-texto">
+          <h3>Missão</h3>
+          <p>Ser a imobiliária de confiança que conecta pessoas a imóveis, transformando sonhos em realidade com segurança, transparência e excelência.</p>
+          
+          <h3>Visão</h3>
+          <p>Consolidar-nos como líderes no mercado imobiliário, reconhecidos pela qualidade de serviço e satisfação dos clientes.</p>
+          
+          <h3>Valores</h3>
+          <ul class="valores-list">
+            <li><i class="fas fa-check"></i> <strong>Integridade</strong> - Agimos com honestidade em todas as transações</li>
+            <li><i class="fas fa-check"></i> <strong>Transparência</strong> - Informações claras e precisas sempre</li>
+            <li><i class="fas fa-check"></i> <strong>Excelência</strong> - Buscamos sempre o melhor resultado</li>
+            <li><i class="fas fa-check"></i> <strong>Humanidade</strong> - Relacionamento humano e personalizado</li>
+          </ul>
+        </div>
+        <div class="sobre-stats">
+          <div class="stat-box">
+            <div class="stat-number">15+</div>
+            <div class="stat-label">Anos de Experiência</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-number">2.5K+</div>
+            <div class="stat-label">Clientes Satisfeitos</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-number">500+</div>
+            <div class="stat-label">Imóveis Intermediados</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-number">99%</div>
+            <div class="stat-label">Taxa de Satisfação</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contato" class="contact container panel reveal">
+      <div class="contact-wrapper">
+        <div class="contact-info-left">
+          <div class="section-header">
+            <h2>Entre em Contato</h2>
+            <p>Estamos prontos para ajudá-lo com suas necessidades imobiliárias</p>
+          </div>
+          <div class="contact-details">
+            <div class="contact-item">
+              <i class="fas fa-map-marker-alt"></i>
+              <div>
+                <strong>Endereço</strong>
+                <p>Avenida Paulista, 1578<br>São Paulo - SP, 01310-100</p>
+              </div>
+            </div>
+            <div class="contact-item">
+              <i class="fas fa-phone"></i>
+              <div>
+                <strong>Telefone</strong>
+                <p><a href="tel:+5511999999999">+55 (11) 99999-9999</a></p>
+              </div>
+            </div>
+            <div class="contact-item">
+              <i class="fas fa-envelope"></i>
+              <div>
+                <strong>E-mail</strong>
+                <p><a href="mailto:contato@prevsimob.com.br">contato@prevsimob.com.br</a></p>
+              </div>
+            </div>
+            <div class="contact-item">
+              <i class="fas fa-clock"></i>
+              <div>
+                <strong>Horário</strong>
+                <p>Seg - Sex: 09:00 às 18:00<br>Sáb: 09:00 às 14:00</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="contact-form-wrapper">
+          <form class="contact-form" id="contactForm">
+            <input type="text" placeholder="Seu Nome" required>
+            <input type="email" placeholder="Seu E-mail" required>
+            <input type="tel" placeholder="Seu Telefone">
+            <select required>
+              <option value="">Selecione um interesse</option>
+              <option value="comprar">Desejo Comprar</option>
+              <option value="alugar">Desejo Alugar</option>
+              <option value="vender">Desejo Vender</option>
+              <option value="consultar">Desejo Consultar</option>
+            </select>
+            <textarea placeholder="Sua Mensagem" rows="5" required></textarea>
+            <button type="submit" class="btn-primary">Enviar Mensagem</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h4>PrevsImob</h4>
+          <p>Conectando pessoas a imóveis.</p>
+        </div>
+        <div class="footer-section">
+          <h4>Links</h4>
+          <ul>
+            <li><a href="#">Propriedades</a></li>
+            <li><a href="#">Sobre nós</a></li>
+            <li><a href="#">Contato</a></li>
+          </ul>
+        </div>
+        <div class="footer-section">
+          <h4>Redes Sociais</h4>
+          <div class="social-links">
+            <a href="#"><i class="fab fa-facebook"></i></a>
+            <a href="#"><i class="fab fa-instagram"></i></a>
+            <a href="#"><i class="fab fa-linkedin"></i></a>
+          </div>
+        </div>
+      </div>
+      <small>© <span id="year">2025</span> PrevsImob. Todos os direitos reservados.</small>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
