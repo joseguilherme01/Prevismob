@@ -1,0 +1,80 @@
+Projeto: Prevismob
+
+1. Objetivo
+
+Desenvolver uma aplicação web capaz de estimar o valor de imóveis residenciais com base em variáveis estruturais e locacionais, utilizando técnicas de análise de dados e aprendizado de máquina.
+
+2. Justificativa
+
+A precificação imobiliária é influenciada por múltiplos fatores, como localização, metragem e características do imóvel. A utilização de modelos preditivos permite gerar estimativas mais consistentes e fundamentadas em dados históricos, além de aplicar conceitos práticos de ciência de dados e desenvolvimento web.
+
+3. Escopo do Sistema
+Funcionalidades principais
+
+Inserção de dados do imóvel:
+
+Bairro/região
+
+Área (m²)
+
+Número de quartos
+
+Banheiros
+
+Vagas de garagem
+
+Tipo de imóvel
+
+Idade do imóvel
+
+Geração de estimativa de valor
+
+Exibição de métricas básicas de confiança do modelo
+
+Visualização simples de comparação com média da região
+
+Fora do escopo
+
+Aplicativo mobile
+
+Integração com portais imobiliários em tempo real
+
+Sistema completo de gestão imobiliária
+
+Avaliação jurídica ou documental do imóvel
+
+4. Metodologia
+
+Coleta de dados: utilização de base pública ou dataset existente.
+
+Tratamento e análise exploratória.
+
+Modelagem preditiva: aplicação e comparação de modelos de regressão.
+
+Avaliação do modelo: métricas como MAE, RMSE e R².
+
+Implementação web: integração do modelo a uma API e interface para o usuário.
+
+5. Arquitetura Proposta
+
+Usuário → Interface Web → API → Modelo Preditivo → Retorno da estimativa
+
+6. Tecnologias Sugeridas
+
+Backend: A Definir
+
+Modelagem: A Definir
+
+Frontend: A Definir
+
+Banco de dados: A Definir
+
+7. Cronograma (1 semestre)
+
+Semanas 1–4: levantamento de requisitos e preparação dos dados
+
+Semanas 5–8: modelagem e avaliação
+
+Semanas 9–12: desenvolvimento da aplicação web
+
+Semanas 13–16: testes, validação e documentação final
