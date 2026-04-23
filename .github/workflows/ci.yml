@@ -45,11 +45,9 @@ jobs:
             cp .env.example .env
             echo ".env criado a partir de .env.example"
           else
-            cat > .env << 'EOF'
-            APP_ENV=development
-            SMTP_DEV_MODE=1
-            JWT_SECRET_KEY=ci-secret-key
-            EOF
+            echo "APP_ENV=development" > .env
+            echo "SMTP_DEV_MODE=1" >> .env
+            echo "JWT_SECRET_KEY=ci-secret-key" >> .env
             echo ".env mínimo criado para CI"
           fi
 
