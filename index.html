@@ -347,6 +347,80 @@
     <!-- /landing-section -->
 
     <!-- ============================================================
+       AUTH — LOGIN
+       ============================================================ -->
+    <div id="auth-section" style="display: none">
+      <main class="dash-main auth-main">
+        <div class="auth-card">
+          <div class="auth-card__header">
+            <h2>Entrar na plataforma</h2>
+            <p>
+              Faça login para acessar a previsão e testar regras de negócio.
+            </p>
+          </div>
+
+          <div class="erro-banner" id="authMensagem" style="display: none">
+            <div class="erro-banner__inner">
+              <span class="erro-banner__icon" aria-hidden="true">⚠</span>
+              <span id="authMensagemTexto"></span>
+            </div>
+          </div>
+
+          <form id="formLogin" class="form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="login_email">E-mail</label>
+              <div class="form-input-wrap">
+                <span class="form-input-icon" aria-hidden="true">@</span>
+                <input
+                  type="email"
+                  id="login_email"
+                  name="login_email"
+                  class="form-input"
+                  placeholder="seuemail@dominio.com"
+                  autocomplete="email"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="login_senha">Senha</label>
+              <div class="form-input-wrap">
+                <span class="form-input-icon" aria-hidden="true">🔒</span>
+                <input
+                  type="password"
+                  id="login_senha"
+                  name="login_senha"
+                  class="form-input"
+                  placeholder="Digite sua senha"
+                  autocomplete="current-password"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              class="btn btn--primary btn--full"
+              id="btnLogin"
+            >
+              Entrar
+            </button>
+
+            <button
+              type="button"
+              class="btn btn--ghost btn--full"
+              id="btnVoltarLanding"
+            >
+              Voltar para a página inicial
+            </button>
+          </form>
+        </div>
+      </main>
+    </div>
+    <!-- /auth-section -->
+
+    <!-- ============================================================
        APP — DASHBOARD DE PREVISÃO
        ============================================================ -->
     <div id="app-section" style="display: none">
@@ -360,7 +434,16 @@
             <span class="nav__logo-icon" aria-hidden="true">◈</span>
             <span>PrevIsmob</span>
           </div>
-          <span class="dash-header__tag">Análise de Imóvel</span>
+          <div class="dash-header__actions">
+            <span class="dash-header__tag">Análise de Imóvel</span>
+            <button
+              class="btn btn--outline btn--sm"
+              id="btn-logout"
+              type="button"
+            >
+              Sair
+            </button>
+          </div>
         </div>
       </header>
 

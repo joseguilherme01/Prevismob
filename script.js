@@ -9,8 +9,20 @@
 // CONFIGURAÇÃO - ENDPOINTS DA API
 // =====================================================================
 
-const API_BASE = "http://localhost:8000";
+const API_BASE =
+  (window.PREVISMOB_CONFIG && window.PREVISMOB_CONFIG.API_BASE) ||
+  localStorage.getItem("PREVISMOB_API_BASE") ||
+  `${window.location.protocol}//${window.location.hostname}:8000`;
 const API_PREVER = `${API_BASE}/prever`; // POST para previsão
+const API_AUTH_LOGIN = `${API_BASE}/auth/login`;
+const API_AUTH_REFRESH = `${API_BASE}/auth/refresh`;
+const API_AUTH_LOGOUT = `${API_BASE}/auth/logout`;
+const API_AUTH_ME = `${API_BASE}/auth/me`;
+
+const ACCESS_TOKEN_KEY = "prevismob_access_token";
+const REFRESH_TOKEN_KEY = "prevismob_refresh_token";
+
+let usuarioSessao = null;
 
 // Seletores de elementos do DOM
 const seletores = {
@@ -33,6 +45,202 @@ const seletores = {
   mensagemErro: "mensagemErro",
   textoErro: "textoErro",
 };
+
+function obterAccessToken() {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+function obterRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function salvarSessao(accessToken, refreshToken, usuario) {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  usuarioSessao = usuario || null;
+}
+
+function limparSessao() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  usuarioSessao = null;
+}
+
+function exibirMensagemAuth(mensagem) {
+  const container = document.getElementById("authMensagem");
+  const texto = document.getElementById("authMensagemTexto");
+  if (!container || !texto) {
+    return;
+  }
+  texto.textContent = mensagem;
+  container.style.display = "block";
+}
+
+function ocultarMensagemAuth() {
+  const container = document.getElementById("authMensagem");
+  if (container) {
+    container.style.display = "none";
+  }
+}
+
+function mostrarAuthSection(mensagem = "") {
+  const landing = document.getElementById("landing-section");
+  const app = document.getElementById("app-section");
+  const auth = document.getElementById("auth-section");
+
+  if (landing) landing.style.display = "none";
+  if (app) app.style.display = "none";
+  if (auth) {
+    auth.style.display = "block";
+    auth.classList.add("fade-in");
+  }
+
+  if (mensagem) {
+    exibirMensagemAuth(mensagem);
+  } else {
+    ocultarMensagemAuth();
+  }
+}
+
+function mostrarLanding() {
+  const landing = document.getElementById("landing-section");
+  const app = document.getElementById("app-section");
+  const auth = document.getElementById("auth-section");
+
+  if (auth) auth.style.display = "none";
+  if (app) app.style.display = "none";
+  if (landing) {
+    landing.style.display = "block";
+    landing.classList.add("fade-in");
+  }
+}
+
+function mostrarApp() {
+  const landing = document.getElementById("landing-section");
+  const app = document.getElementById("app-section");
+  const auth = document.getElementById("auth-section");
+
+  if (landing) landing.style.display = "none";
+  if (auth) auth.style.display = "none";
+  if (app) {
+    app.style.display = "block";
+    app.classList.add("fade-in");
+  }
+}
+
+async function renovarAccessToken() {
+  const refreshToken = obterRefreshToken();
+  if (!refreshToken) {
+    return false;
+  }
+
+  try {
+    const resposta = await fetch(API_AUTH_REFRESH, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!resposta.ok) {
+      return false;
+    }
+
+    const data = await resposta.json();
+    salvarSessao(data.access_token, data.refresh_token, data.usuario);
+    return true;
+  } catch (_erro) {
+    return false;
+  }
+}
+
+async function authFetch(url, options = {}, retryRefresh = true) {
+  const headers = {
+    ...(options.headers || {}),
+  };
+
+  const accessToken = obterAccessToken();
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  const resposta = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  if (resposta.status === 401 && retryRefresh) {
+    const refreshed = await renovarAccessToken();
+    if (refreshed) {
+      return authFetch(url, options, false);
+    }
+  }
+
+  return resposta;
+}
+
+async function encerrarSessaoFrontend(mensagem) {
+  const refreshToken = obterRefreshToken();
+  if (refreshToken) {
+    try {
+      await fetch(API_AUTH_LOGOUT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+    } catch (_erro) {
+      // sem efeito colateral para o usuário
+    }
+  }
+
+  limparSessao();
+  mostrarAuthSection(mensagem || "Sessão encerrada. Faça login novamente.");
+}
+
+async function restaurarSessao() {
+  const accessToken = obterAccessToken();
+  const refreshToken = obterRefreshToken();
+
+  if (!accessToken && !refreshToken) {
+    return false;
+  }
+
+  if (!accessToken && refreshToken) {
+    const refreshed = await renovarAccessToken();
+    if (!refreshed) {
+      limparSessao();
+      return false;
+    }
+  }
+
+  try {
+    const resposta = await authFetch(
+      API_AUTH_ME,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+      false,
+    );
+
+    if (!resposta.ok) {
+      limparSessao();
+      return false;
+    }
+
+    const data = await resposta.json();
+    usuarioSessao = data.usuario;
+    return true;
+  } catch (_erro) {
+    limparSessao();
+    return false;
+  }
+}
 
 // =====================================================================
 // FUNÇÕES UTILITÁRIAS
@@ -263,7 +471,7 @@ async function calcularValor() {
 
     // ========== ENVIAR PARA API ==========
     console.log(`🌐 POST para ${API_PREVER}...`);
-    const resposta = await fetch(API_PREVER, {
+    const resposta = await authFetch(API_PREVER, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -271,6 +479,18 @@ async function calcularValor() {
       },
       body: JSON.stringify(dados),
     });
+
+    if (resposta.status === 401) {
+      await encerrarSessaoFrontend("Sua sessão expirou. Faça login novamente.");
+      return;
+    }
+
+    if (resposta.status === 403) {
+      await encerrarSessaoFrontend(
+        "Seu usuário está inativo. Acesso bloqueado.",
+      );
+      return;
+    }
 
     // ========== VERIFICAR RESPOSTA ==========
     if (!resposta.ok) {
@@ -343,13 +563,83 @@ document.addEventListener("DOMContentLoaded", async function () {
   console.log("✓ PrevIsmob Frontend v2.0 - Carregado");
   console.log(`📍 API: ${API_BASE}`);
 
+  const formLogin = document.getElementById("formLogin");
+  const btnVoltarLanding = document.getElementById("btnVoltarLanding");
+  const btnLogout = document.getElementById("btn-logout");
+
+  if (btnVoltarLanding) {
+    btnVoltarLanding.addEventListener("click", function () {
+      mostrarLanding();
+    });
+  }
+
+  if (formLogin) {
+    formLogin.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      ocultarMensagemAuth();
+
+      const email = document.getElementById("login_email").value.trim();
+      const senha = document.getElementById("login_senha").value;
+
+      if (!email || !senha) {
+        exibirMensagemAuth("Informe e-mail e senha para continuar.");
+        return;
+      }
+
+      const btnLogin = document.getElementById("btnLogin");
+      const textoOriginal = btnLogin ? btnLogin.textContent : "Entrar";
+
+      try {
+        if (btnLogin) {
+          btnLogin.disabled = true;
+          btnLogin.textContent = "Entrando...";
+        }
+
+        const resposta = await fetch(API_AUTH_LOGIN, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ email, senha }),
+        });
+
+        if (!resposta.ok) {
+          const erro = await resposta.json();
+          exibirMensagemAuth(erro.detail || "Falha no login.");
+          return;
+        }
+
+        const data = await resposta.json();
+        salvarSessao(data.access_token, data.refresh_token, data.usuario);
+        mostrarApp();
+      } catch (_erro) {
+        exibirMensagemAuth(
+          "Não foi possível conectar ao servidor de autenticação.",
+        );
+      } finally {
+        if (btnLogin) {
+          btnLogin.disabled = false;
+          btnLogin.textContent = textoOriginal;
+        }
+      }
+    });
+  }
+
+  if (btnLogout) {
+    btnLogout.addEventListener("click", async function () {
+      await encerrarSessaoFrontend("Logout realizado com sucesso.");
+    });
+  }
+
   // landing page: iniciar app quando usuário clicar
   // função reutilizável para iniciar a aplicação a partir da landing
   function iniciarApp() {
-    document.getElementById("landing-section").style.display = "none";
-    const app = document.getElementById("app-section");
-    app.style.display = "block";
-    app.classList.add("fade-in");
+    if (!obterAccessToken()) {
+      mostrarAuthSection("Faça login para acessar a análise.");
+      return;
+    }
+    mostrarApp();
   }
 
   // vincular tanto o botão antigo (se existir) quanto o botão dentro do card
@@ -357,19 +647,15 @@ document.addEventListener("DOMContentLoaded", async function () {
   if (btnComecar) {
     btnComecar.addEventListener("click", iniciarApp);
   }
-  const btnCard = document.querySelector(".card-button");
-  if (btnCard) {
+  const btnCards = document.querySelectorAll(".card-button");
+  btnCards.forEach((btnCard) => {
     btnCard.addEventListener("click", iniciarApp);
-  }
+  });
   // botão voltar na app-section
   const btnVoltar = document.getElementById("btn-voltar");
   if (btnVoltar) {
     btnVoltar.addEventListener("click", () => {
-      const app = document.getElementById("app-section");
-      app.style.display = "none";
-      const landing = document.getElementById("landing-section");
-      landing.style.display = "block";
-      landing.classList.add("fade-in");
+      mostrarLanding();
     });
   }
 
@@ -378,6 +664,10 @@ document.addEventListener("DOMContentLoaded", async function () {
   if (formulario) {
     formulario.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (!obterAccessToken()) {
+        mostrarAuthSection("Faça login para continuar.");
+        return;
+      }
       calcularValor();
     });
   }
@@ -386,4 +676,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   document.querySelectorAll("input, select").forEach((elemento) => {
     elemento.addEventListener("focus", ocultarErro);
   });
+
+  const sessaoOk = await restaurarSessao();
+  if (!sessaoOk) {
+    limparSessao();
+  }
 });

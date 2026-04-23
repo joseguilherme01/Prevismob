@@ -238,6 +238,49 @@ button {
   justify-content: center;
 }
 
+.auth-main {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(45, 125, 210, 0.14), transparent 45%),
+    radial-gradient(circle at 85% 10%, rgba(10, 22, 40, 0.1), transparent 42%),
+    linear-gradient(180deg, #f8fafc 0%, #edf3f9 100%);
+  padding: var(--sp-6);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--c-white);
+  border: 1px solid var(--c-gray-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--sp-8);
+}
+
+.auth-card__header {
+  margin-bottom: var(--sp-6);
+}
+
+.auth-card__header h2 {
+  color: var(--c-navy);
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+  margin-bottom: var(--sp-2);
+}
+
+.auth-card__header p {
+  color: var(--c-gray-600);
+  font-size: var(--text-sm);
+}
+
+.dash-header__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
 /* ----------------------------------------------------------------
    4. BADGES & TAGS
    ---------------------------------------------------------------- */

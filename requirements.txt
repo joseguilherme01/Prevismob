@@ -1,53 +1,63 @@
 # ========================================================================
-# PrevIsmob - Dependências do Backend
+# PrevIsmob - Runtime da API (produção)
 # ========================================================================
-# Para instalar todas as dependências:
-# pip install -r requirements.txt
+# Contém APENAS dependências efetivamente importadas pela API em execução
+# (api.py, db.py, testar_conexao.py).
+# Para treino/notebooks/scraping use: requirements-train.txt
+#
+# Instalação:
+#   pip install -r requirements.txt
+#
+# Ambiente testado: Python 3.11 / 3.12 (Windows + Linux)
 # ========================================================================
 
-# FastAPI - Framework web moderno para APIs
+# ------------------------------------------------------------------------
+# Web framework / servidor ASGI
+# ------------------------------------------------------------------------
 fastapi==0.104.1
-
-# Uvicorn - Servidor ASGI para FastAPI
 uvicorn[standard]==0.24.0
 
-# Pydantic - Validação de dados e serializacao JSON
+# ------------------------------------------------------------------------
+# Validação de dados (Pydantic v2)
+# ------------------------------------------------------------------------
 pydantic==2.5.0
 pydantic-core==2.14.1
+email-validator>=2.0.0          # Requerido por pydantic.EmailStr
 
-# Joblib - Serialização de objetos Python (para carregar modelos sklearn)
+# ------------------------------------------------------------------------
+# Banco de dados (MySQL via SQLAlchemy)
+# ------------------------------------------------------------------------
+SQLAlchemy==1.4.52
+PyMySQL==1.1.0
+
+# ------------------------------------------------------------------------
+# Autenticação (JWT + hash de senha)
+# ------------------------------------------------------------------------
+# IMPORTANTE: manter bcrypt==4.0.1 para compatibilidade com passlib 1.7.4.
+# passlib 1.7.4 lê bcrypt.__about__.__version__, atributo removido no
+# bcrypt >= 4.1, causando:
+#   AttributeError: module 'bcrypt' has no attribute '__about__'
+PyJWT==2.9.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+
+# ------------------------------------------------------------------------
+# Machine Learning / dados
+# (necessários em runtime: joblib.load() recria o estimador scikit-learn
+#  salvo em modelo_imoveis.pkl)
+# ------------------------------------------------------------------------
+scikit-learn==1.3.2
+numpy==1.26.2
+pandas==2.1.3
 joblib==1.3.2
 
-# Pandas - Manipulação de dados em DataFrames
-pandas==2.1.3
+# ------------------------------------------------------------------------
+# Integrações externas
+# ------------------------------------------------------------------------
+requests==2.31.0                # Chamadas HTTP à Google Maps API
+geopy==2.4.1                    # Cálculo de distância geodésica
 
-# Scikit-Learn - Machine Learning (necessário para usar modelos treinados)
-scikit-learn==1.3.2
-
-# NumPy - Operações numéricas (dependência do scikit-learn)
-numpy==1.26.2
-
-# ========================================================================
-# Pacotes opcionais para desenvolvimento
-# ========================================================================
-
-# python-dotenv - Carregamento de variáveis de ambiente (.env)
+# ------------------------------------------------------------------------
+# Configuração / ambiente
+# ------------------------------------------------------------------------
 python-dotenv==1.0.0
-
-# Google Maps API client
-googlemaps==4.10.0
-
-# pytest - Framework de testes
-# pytest==7.4.3
-
-# pytest-asyncio - Suporte a testes async
-# pytest-asyncio==0.21.1
-
-# black - Formatador de código
-# black==23.12.0
-
-# flake8 - Linter
-# flake8==6.1.0
-
-# mypy - Type checker
-# mypy==1.7.1

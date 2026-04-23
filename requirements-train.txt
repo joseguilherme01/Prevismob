@@ -1,0 +1,42 @@
+# ========================================================================
+# PrevIsmob - Treino / Análise / Scraping (desenvolvimento)
+# ========================================================================
+# Use este arquivo em máquinas de experimentação, scripts de ETL,
+# treino do modelo e coleta de dados. NÃO precisa estar no servidor
+# de produção.
+#
+# Instalação:
+#   pip install -r requirements-train.txt
+# ========================================================================
+
+# Reaproveita todo o runtime da API (pandas, numpy, scikit-learn, joblib,
+# requests etc. já ficam disponíveis aqui).
+-r requirements.txt
+
+# ------------------------------------------------------------------------
+# Visualização (treinar_ia.py, explorar_ia.py, scripts/analise_visual.py)
+# ------------------------------------------------------------------------
+matplotlib==3.8.2
+seaborn==0.13.0
+
+# ------------------------------------------------------------------------
+# Parsing HTML (scripts/parser_local.py)
+# ------------------------------------------------------------------------
+beautifulsoup4==4.12.2
+
+# ------------------------------------------------------------------------
+# Scraping / automação de navegador
+# (scripts/scraper_imoveis.py, scripts/scraper_google_blindado.py)
+# ------------------------------------------------------------------------
+selenium==4.16.0
+webdriver-manager==4.0.1
+
+# ------------------------------------------------------------------------
+# Ferramentas de desenvolvimento (opcionais — descomente se for usar)
+# ------------------------------------------------------------------------
+# pytest==7.4.3
+# pytest-asyncio==0.21.1
+# httpx==0.25.2
+# black==23.12.0
+# flake8==6.1.0
+# mypy==1.7.1
