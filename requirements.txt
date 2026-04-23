@@ -61,3 +61,4 @@ geopy==2.4.1                    # Cálculo de distância geodésica
 # Configuração / ambiente
 # ------------------------------------------------------------------------
 python-dotenv==1.0.0
+httpx
