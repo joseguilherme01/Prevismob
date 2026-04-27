@@ -4,15 +4,19 @@ Utiliza FastAPI com modelo Scikit-Learn treinado (joblib)
 Integração com dataset CSV para dados de proximidade georreferenciada
 """
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 import joblib
 import pandas as pd
 import os
-from typing import List
+from typing import List, Optional
 import time
+import io
+import csv
+import uuid
 import requests
 import unicodedata
 import re
@@ -58,8 +62,14 @@ def _parse_cors_origins() -> list[str]:
 
 app = FastAPI(
     title="PrevIsmob API",
-    description="API para previsão de preços de imóveis em Águas Claras",
-    version="2.0.0"
+    description=(
+        "API para previsão de preços de imóveis em Águas Claras.\n\n"
+        "**Versionamento**: a partir de v2.1.0 o caminho canônico dos endpoints é "
+        "`/v1/...`. Os caminhos legados (sem prefixo) continuam funcionando como "
+        "alias durante a janela de coexistência (mínimo 1 trimestre). "
+        "Veja `README_ARQUITETURA.md` seção *Versionamento de API*."
+    ),
+    version="2.1.0",
 )
 
 # ============================================================================
@@ -86,12 +96,65 @@ app.add_middleware(
 #     quando o usuário navega a partir do e-mail de verificação.
 # - X-Content-Type-Options: nosniff
 #     Hardening baixo custo; não altera CORS nem payloads.
+# - X-Frame-Options: DENY
+#     Defesa contra clickjacking (a UI não é desenhada para iframe externo).
+# - Content-Security-Policy: política mínima coerente com o frontend atual.
+#     Permite recursos inline (estilo/scripts in-page do `index.html`),
+#     fontes via data:, e chamadas à API (mesma origem). Endurecer com
+#     hashes/nonces após remover scripts/estilos inline.
 # ----------------------------------------------------------------------------
+_DEFAULT_CSP = (
+    "default-src 'self'; "
+    "img-src 'self' data: blob: https:; "
+    "font-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "connect-src 'self' http: https:; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
+
 @app.middleware("http")
 async def _security_headers_middleware(request: Request, call_next):
     response = await call_next(request)
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Content-Security-Policy", _DEFAULT_CSP)
+    return response
+
+
+# ----------------------------------------------------------------------------
+# Versionamento de API: alias `/v1/...` -> caminho canônico atual
+#
+# Estratégia de transição:
+#   - O caminho canônico público passa a ser `/v1/...`.
+#   - Os caminhos legados (sem prefixo) continuam funcionando durante a
+#     janela de coexistência (mínimo 1 trimestre).
+#   - Quando uma requisição chega em `/v1/<rota>`, reescrevemos o caminho
+#     ASGI para `/<rota>` antes do roteamento, e adicionamos os headers
+#     padrão de versão (`X-API-Version`).
+# ----------------------------------------------------------------------------
+API_VERSION = "v1"
+
+
+@app.middleware("http")
+async def _api_version_middleware(request: Request, call_next):
+    path: str = request.scope.get("path", "") or ""
+    rewritten = False
+    if path == "/v1" or path.startswith("/v1/"):
+        new_path = path[len("/v1"):] or "/"
+        request.scope["path"] = new_path
+        raw = request.scope.get("raw_path")
+        if isinstance(raw, (bytes, bytearray)) and (raw == b"/v1" or raw.startswith(b"/v1/")):
+            request.scope["raw_path"] = raw[len(b"/v1"):] or b"/"
+        rewritten = True
+    response = await call_next(request)
+    response.headers.setdefault("X-API-Version", API_VERSION)
+    if rewritten:
+        response.headers.setdefault("X-API-Path-Rewritten", "v1")
     return response
 
 # ============================================================================
@@ -173,6 +236,8 @@ class RespostaPrevicao(BaseModel):
     Latitude: float = Field(..., description="Latitude do prédio")
     Longitude: float = Field(..., description="Longitude do prédio")
     status: str = Field(default="sucesso", description="Status da previsão")
+    avaliacao_id: Optional[int] = Field(default=None, description="ID da avaliação salva (auth)")
+    quota: Optional[dict] = Field(default=None, description="Metadados de cota diária")
 
 
 class LoginRequest(BaseModel):
@@ -418,7 +483,12 @@ if all([DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME]):
 else:
     print("⚠️ Variáveis de banco incompletas no .env (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME).")
 
-MODEL_NAME = "XGBoost"
+# Rastreabilidade do modelo: o `.pkl` carregado em runtime é produzido por
+# `treinar_ia.py` usando `RandomForestRegressor` (scikit-learn). Manter os
+# valores abaixo em sincronia com o algoritmo realmente treinado para que o
+# registro em `modelos_ml` seja auditável. Se migrar para outro estimador,
+# atualizar simultaneamente este nome, `treinar_ia.py` e `requirements.txt`.
+MODEL_NAME = "RandomForest"
 MODEL_VERSION = "v1.0.0"
 MODEL_FILE_PATH = "modelo_imoveis.pkl"
 
@@ -555,6 +625,242 @@ def _ensure_email_verification_columns() -> None:
 
 
 _ensure_email_verification_columns()
+
+
+# ============================================================================
+# CONFIGURAÇÃO DE COTA DIÁRIA / GUESTS
+# ============================================================================
+#
+# Decisões de modelagem:
+# - "Dia" = dia local do servidor MySQL (CURDATE()/DATE(criado_em)). Mantemos
+#   consistência com `criado_em DEFAULT CURRENT_TIMESTAMP` da tabela
+#   `avaliacoes` — sem necessidade de coluna timezone-aware.
+# - Guest tracking: cookie httpOnly `prevismob_guest_id` com UUID v4.
+#   Quando ausente, geramos um na primeira requisição e devolvemos via
+#   `Set-Cookie`. Fallback: hash de IP+User-Agent quando cookies não estão
+#   disponíveis (ex.: clientes sem cookie jar). Não rastreamos PII.
+# - Cota: contamos APENAS avaliações com status='SUCESSO' do dia corrente.
+#   Tentativas que falharem com erro de geocoding/Maps não consomem cota.
+# - 429 com payload amigável e header `Retry-After` apontando para a
+#   próxima virada de dia (segundos).
+
+GUEST_COOKIE_NAME = "prevismob_guest_id"
+GUEST_COOKIE_MAX_AGE_DAYS = 365
+DAILY_LIMIT_GUEST = int(os.getenv("DAILY_LIMIT_GUEST", "2"))
+DAILY_LIMIT_AUTH = int(os.getenv("DAILY_LIMIT_AUTH", "10"))
+
+
+def _ensure_quota_favoritos_columns() -> None:
+    """Migração runtime idempotente para cota/favoritos.
+
+    Espelha `migrations/2026_04_25_quotas_favoritos.sql` para manter o
+    backend operacional mesmo sem aplicação manual da migração.
+    """
+    if engine is None:
+        return
+
+    required = {
+        "guest_id": "VARCHAR(64) NULL",
+        "is_favorita": "TINYINT(1) NOT NULL DEFAULT 0",
+        "nome_predio_input": "VARCHAR(255) NULL",
+    }
+    desired_indexes = {
+        "ix_avaliacoes_usuario_dia": "(usuario_id, criado_em)",
+        "ix_avaliacoes_guest_dia": "(guest_id, criado_em)",
+        "ix_avaliacoes_favoritas": "(usuario_id, is_favorita)",
+    }
+
+    try:
+        with engine.begin() as conn:
+            existing_cols = {
+                row[0]
+                for row in conn.execute(
+                    text(
+                        """
+                        SELECT COLUMN_NAME
+                        FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = 'avaliacoes'
+                        """
+                    )
+                ).all()
+            }
+            for col, ddl in required.items():
+                if col not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE avaliacoes ADD COLUMN {col} {ddl}"))
+                    print(f"[migration] coluna adicionada: avaliacoes.{col}")
+
+            # usuario_id precisa permitir NULL (visitantes)
+            row = conn.execute(
+                text(
+                    """
+                    SELECT IS_NULLABLE
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'avaliacoes'
+                      AND COLUMN_NAME = 'usuario_id'
+                    """
+                )
+            ).first()
+            if row and row[0] == "NO":
+                try:
+                    conn.execute(text("ALTER TABLE avaliacoes MODIFY COLUMN usuario_id BIGINT NULL"))
+                    print("[migration] avaliacoes.usuario_id alterado para NULL permitido")
+                except SQLAlchemyError as exc:
+                    print(f"⚠️ Falha ao alterar usuario_id para NULL: {exc}")
+
+            existing_indexes = {
+                r[0]
+                for r in conn.execute(
+                    text(
+                        """
+                        SELECT DISTINCT INDEX_NAME
+                        FROM INFORMATION_SCHEMA.STATISTICS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = 'avaliacoes'
+                        """
+                    )
+                ).all()
+            }
+            for name, cols in desired_indexes.items():
+                if name not in existing_indexes:
+                    try:
+                        conn.execute(text(f"CREATE INDEX {name} ON avaliacoes {cols}"))
+                        print(f"[migration] índice criado: {name}")
+                    except SQLAlchemyError as exc:
+                        print(f"⚠️ Falha ao criar índice {name}: {exc}")
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Falha na migração automática de quotas/favoritos: {exc}")
+
+
+_ensure_quota_favoritos_columns()
+
+
+def _hash_guest_fallback(ip: str | None, ua: str | None) -> str:
+    """Gera ID determinístico para guests sem cookie. Não armazena PII direto."""
+    raw = f"{ip or '-'}|{ua or '-'}"
+    return "fb_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+
+
+def _get_or_create_guest_id(request: Request, response: Response | None) -> str:
+    """Lê cookie `prevismob_guest_id` ou cria um novo (UUID v4).
+
+    Quando cria, escreve em `response` com httpOnly+SameSite=Lax. Se
+    `response` é None (ex.: contagem em rotas GET sem set-cookie), usa
+    fallback determinístico baseado em IP+UA.
+    """
+    cookie_val = request.cookies.get(GUEST_COOKIE_NAME)
+    if cookie_val and len(cookie_val) >= 8 and len(cookie_val) <= 64:
+        return cookie_val
+
+    if response is None:
+        ip = request.client.host if request and request.client else None
+        ua = request.headers.get("user-agent") if request else None
+        return _hash_guest_fallback(ip, ua)
+
+    new_id = "g_" + uuid.uuid4().hex
+    response.set_cookie(
+        key=GUEST_COOKIE_NAME,
+        value=new_id,
+        max_age=GUEST_COOKIE_MAX_AGE_DAYS * 24 * 3600,
+        httponly=True,
+        samesite="lax",
+        secure=False,  # produção deve setar via reverse proxy; em dev, http local
+        path="/",
+    )
+    return new_id
+
+
+def _seconds_until_next_day() -> int:
+    """Segundos até a próxima meia-noite (do servidor)."""
+    now = datetime.now()
+    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(1, int((tomorrow - now).total_seconds()))
+
+
+def _count_predictions_today(usuario_id: int | None, guest_id: str | None) -> int:
+    """Conta previsões SUCESSO do dia corrente para usuário OU guest."""
+    if engine is None:
+        return 0
+    if usuario_id is None and not guest_id:
+        return 0
+
+    try:
+        with engine.connect() as conn:
+            if usuario_id is not None:
+                row = conn.execute(
+                    text(
+                        """
+                        SELECT COUNT(*) FROM avaliacoes
+                        WHERE usuario_id = :uid
+                          AND status = 'SUCESSO'
+                          AND DATE(criado_em) = CURDATE()
+                        """
+                    ),
+                    {"uid": int(usuario_id)},
+                ).scalar() or 0
+            else:
+                row = conn.execute(
+                    text(
+                        """
+                        SELECT COUNT(*) FROM avaliacoes
+                        WHERE guest_id = :gid
+                          AND usuario_id IS NULL
+                          AND status = 'SUCESSO'
+                          AND DATE(criado_em) = CURDATE()
+                        """
+                    ),
+                    {"gid": guest_id},
+                ).scalar() or 0
+            return int(row)
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Erro ao contar previsões do dia: {exc}")
+        return 0
+
+
+def _build_quota_payload(
+    is_authenticated: bool,
+    used_today: int,
+    daily_limit: int,
+) -> dict:
+    remaining = max(0, daily_limit - used_today)
+    return {
+        "is_authenticated": bool(is_authenticated),
+        "daily_limit": int(daily_limit),
+        "used_today": int(used_today),
+        "remaining_today": int(remaining),
+        "limit_reached": remaining <= 0,
+    }
+
+
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> dict | None:
+    """Variante de `get_current_user` que NÃO falha sem token.
+
+    Retorna o usuário se houver Bearer válido; caso contrário, None.
+    Tokens inválidos/expirados retornam None (tratamos como guest) em vez
+    de 401, para preservar a UX da landing pública. Tokens revogados ou de
+    usuários inativos também viram guest silencioso.
+    """
+    if credentials is None or not credentials.credentials:
+        return None
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+
+    if payload.get("type") != "access":
+        return None
+    sub = payload.get("sub")
+    if not sub:
+        return None
+
+    user = _get_user_by_id(int(sub))
+    if not user or int(user.get("ativo", 0)) == 0:
+        return None
+    return user
+
 
 
 def _is_bcrypt_hash(stored_hash: str | None) -> bool:
@@ -698,6 +1004,66 @@ def _update_user_last_login(user_id: int) -> None:
             text("UPDATE usuarios SET ultimo_login_em = CURRENT_TIMESTAMP WHERE id_usuario = :user_id"),
             {"user_id": int(user_id)}
         )
+
+
+def _delete_user_account(user_id: int) -> bool:
+    """Anonimiza o usuário e severa vínculos com dados pessoais.
+
+    Estratégia (LGPD): **anonimização** em vez de hard delete para preservar
+    integridade referencial e auditoria de avaliações agregadas. Após esta
+    operação:
+      - `usuarios.email` é substituído por um marcador único e inválido;
+      - `usuarios.nome` recebe rótulo genérico;
+      - `usuarios.senha_hash` é substituído por valor aleatório (impede login);
+      - `usuarios.ativo = 0` e flags de verificação são limpas;
+      - todas as sessões de refresh são revogadas;
+      - registros em `avaliacoes` mantêm-se para análise agregada, mas têm
+        `usuario_id` setado para `NULL` (sem reverso possível).
+
+    Retorna `True` quando o usuário existia e foi anonimizado.
+    """
+    if engine is None:
+        return False
+    placeholder_email = f"deleted+{int(user_id)}@anonymized.local"
+    placeholder_hash = secrets.token_hex(32)
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    UPDATE usuarios
+                       SET email = :placeholder_email,
+                           nome = 'Usuário removido',
+                           senha_hash = :placeholder_hash,
+                           ativo = 0,
+                           email_verificado_em = NULL,
+                           email_verificacao_token_hash = NULL,
+                           email_verificacao_expira_em = NULL,
+                           email_verificacao_enviado_em = NULL
+                     WHERE id_usuario = :user_id
+                    """
+                ),
+                {
+                    "placeholder_email": placeholder_email,
+                    "placeholder_hash": placeholder_hash,
+                    "user_id": int(user_id),
+                },
+            )
+            if (result.rowcount or 0) == 0:
+                return False
+            conn.execute(
+                text("DELETE FROM sessoes WHERE usuario_id = :user_id"),
+                {"user_id": int(user_id)},
+            )
+            # Sevra o vínculo de avaliações sem destruir o registro agregado.
+            conn.execute(
+                text("UPDATE avaliacoes SET usuario_id = NULL WHERE usuario_id = :user_id"),
+                {"user_id": int(user_id)},
+            )
+        return True
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Erro ao anonimizar usuário {user_id}: {exc}")
+        return False
 
 
 def _get_valid_session_by_refresh_hash(refresh_token_hash: str) -> dict | None:
@@ -950,18 +1316,20 @@ def _save_avaliacao(
     preco_minimo_rs: float | None = None,
     preco_sugerido_rs: float | None = None,
     preco_maximo_rs: float | None = None,
-) -> None:
+    guest_id: str | None = None,
+    nome_predio_input: str | None = None,
+) -> int | None:
     """
     Persiste em avaliacoes.
     Obs: schema atual usa campos *_rs; aqui guardamos valor de m² conforme seu fluxo atual.
     """
     if engine is None:
         print("⚠️ Banco não disponível. Avaliação não persistida.")
-        return
+        return None
 
     if condominio_id is None or modelo_id is None:
         print("⚠️ condominio_id/modelo_id ausentes. Avaliação não persistida.")
-        return
+        return None
 
     try:
         def _safe_float(value):
@@ -1049,26 +1417,27 @@ def _save_avaliacao(
             preco_maximo_rs_db = round(preco_maximo_rs_db, 2)
 
         with engine.begin() as conn:
-            conn.execute(
+            result = conn.execute(
                 text("""
                     INSERT INTO avaliacoes (
-                        usuario_id, ip_origem, condominio_id, modelo_id,
+                        usuario_id, guest_id, ip_origem, condominio_id, modelo_id,
                         area_util_m2, valor_condominio_rs, quartos, vagas,
                         preco_m2_minimo, preco_m2_sugerido, preco_m2_maximo,
                         preco_total_minimo_rs, preco_total_sugerido_rs, preco_total_maximo_rs,
                         preco_minimo_rs, preco_sugerido_rs, preco_maximo_rs,
-                        status, mensagem_erro, tempo_processamento_ms
+                        status, mensagem_erro, tempo_processamento_ms, nome_predio_input
                     ) VALUES (
-                        :usuario_id, :ip_origem, :condominio_id, :modelo_id,
+                        :usuario_id, :guest_id, :ip_origem, :condominio_id, :modelo_id,
                         :area_util_m2, :valor_condominio_rs, :quartos, :vagas,
                         :preco_m2_minimo, :preco_m2_sugerido, :preco_m2_maximo,
                         :preco_total_minimo_rs, :preco_total_sugerido_rs, :preco_total_maximo_rs,
                         :preco_minimo_rs, :preco_sugerido_rs, :preco_maximo_rs,
-                        :status, :mensagem_erro, :tempo_processamento_ms
+                        :status, :mensagem_erro, :tempo_processamento_ms, :nome_predio_input
                     )
                 """),
                 {
                     "usuario_id": usuario_id,
+                    "guest_id": guest_id,
                     "ip_origem": ip_origem,
                     "condominio_id": condominio_id,
                     "modelo_id": modelo_id,
@@ -1088,10 +1457,16 @@ def _save_avaliacao(
                     "status": status,
                     "mensagem_erro": mensagem_erro[:500] if mensagem_erro else None,
                     "tempo_processamento_ms": int(tempo_processamento_ms) if tempo_processamento_ms is not None else None,
+                    "nome_predio_input": (nome_predio_input or "")[:255] or None,
                 }
             )
+            try:
+                return int(result.lastrowid) if result.lastrowid else None
+            except Exception:
+                return None
     except SQLAlchemyError as e:
         print(f"⚠️ Erro ao salvar avaliação: {e}")
+        return None
 
 
 # ============================================================================
@@ -1540,13 +1915,48 @@ async def auth_logout(payload: LogoutRequest):
 async def auth_me(current_user: dict = Depends(get_current_user)):
     return {"usuario": _build_user_payload(current_user)}
 
+
+@app.delete(
+    "/auth/me",
+    tags=["Auth"],
+    summary="Exclui (anonimiza) a conta do usuário autenticado",
+    responses={
+        200: {"description": "Conta anonimizada e sessões revogadas."},
+        401: {"description": "Autenticação obrigatória."},
+        500: {"description": "Falha ao processar exclusão."},
+    },
+)
+async def auth_me_delete(current_user: dict = Depends(get_current_user)):
+    """Exclusão self-service da conta (LGPD).
+
+    Operação **irreversível**: anonimiza dados pessoais (e-mail, nome, senha),
+    desativa o usuário, revoga todas as sessões de refresh e severa o vínculo
+    com `avaliacoes` (mantidas anonimizadas para análise agregada).
+
+    O cliente deve descartar imediatamente o access token após o sucesso —
+    novas chamadas autenticadas falharão (`401`) na próxima validação.
+    """
+    if engine is None:
+        raise HTTPException(status_code=500, detail="Banco de dados indisponível")
+
+    user_id = int(current_user["id_usuario"])
+    ok = _delete_user_account(user_id)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Não foi possível concluir a exclusão.")
+    return {
+        "status": "conta_excluida",
+        "mensagem": "Conta anonimizada e sessões revogadas. Dados pessoais foram removidos.",
+    }
+
 @app.get("/", tags=["Info"])
 async def root():
     """Rota raiz - informações da API"""
     return {
         "nome": "PrevIsmob API",
         "descricao": "Sistema de previsão de preços de imóveis",
-        "versao": "2.0.0",
+        "versao": "2.1.0",
+        "api_version": API_VERSION,
+        "caminho_canonico": f"/{API_VERSION}",
         "dataset_carregado": df_condominios is not None,
         "modelo_carregado": modelo_ml is not None,
         "endpoints_principais": ["/condominio", "/prever"]
@@ -1582,40 +1992,62 @@ async def obter_condominio():
 async def prever_preco(
     dados: DadosImovelUsuario,
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    response: Response,
+    current_user: dict | None = Depends(get_optional_user),
 ):
     """
     Endpoint para previsão de preço do imóvel.
-    
-    Recebe dados básicos do usuário e Nome_Predio. A partir do endereço
-    faz geocoding usando Google Maps para obter coordenadas e métricas de
-    proximidade dinamicamente (metrô, parques, escolas, mercados). Não
-    depende mais de um dataset local. Calcula Condominio_m2, monta o DataFrame
-    com as 7 variáveis esperadas e faz a previsão.
-    
-    Args:
-        dados (DadosImovelUsuario): Dados do usuário (5 campos)
-        
-    Returns:
-        RespostaPrevicao: Preço por m² predito
+
+    Aceita requisições autenticadas (JWT) ou anônimas (guest). Aplica cota
+    diária:
+    - Guest: ``DAILY_LIMIT_GUEST`` previsões/dia (default 2).
+    - Autenticado: ``DAILY_LIMIT_AUTH`` previsões/dia (default 10).
+
+    Quando a cota é atingida retorna 429 com payload ``{quota:{...}}``.
+    Cada resposta inclui ``quota`` para permitir UX em tempo real no
+    frontend (contador de previsões restantes).
     """
-    
+
     # ========== VALIDAÇÕES ==========
 
     if dados.Area_Util is None or dados.Area_Util <= 0:
         raise HTTPException(status_code=422, detail="Area_Util deve ser maior que zero.")
-    
+
     if modelo_ml is None:
         raise HTTPException(
             status_code=500,
             detail="Modelo ML não foi carregado"
         )
-    
+
+    # ========== IDENTIFICAÇÃO E COTA ==========
+    is_authenticated = current_user is not None
+    usuario_id: int | None = int(current_user["id_usuario"]) if is_authenticated else None
+    guest_id: str | None = None if is_authenticated else _get_or_create_guest_id(request, response)
+    daily_limit = DAILY_LIMIT_AUTH if is_authenticated else DAILY_LIMIT_GUEST
+
+    used_today = _count_predictions_today(usuario_id=usuario_id, guest_id=guest_id)
+    if used_today >= daily_limit:
+        quota_payload = _build_quota_payload(is_authenticated, used_today, daily_limit)
+        retry_after = _seconds_until_next_day()
+        # Retorna 429 amigável; frontend traduz mensagem conforme is_authenticated
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "mensagem": (
+                    "Você atingiu o limite diário de previsões. "
+                    "Crie uma conta gratuita para liberar mais avaliações."
+                    if not is_authenticated
+                    else "Você atingiu o limite diário de previsões. Tente novamente amanhã."
+                ),
+                "quota": quota_payload,
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
+
     # o dataset não é necessário nesta rota; só usamos Google Maps para localizar o imóvel
     t0 = time.perf_counter()
     ip_origem = request.client.host if request and request.client else None
 
-    usuario_id = int(current_user["id_usuario"])
     condominio_id = None
     modelo_id = _get_or_create_modelo_id()
     
@@ -1814,7 +2246,7 @@ async def prever_preco(
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
 
-        _save_avaliacao(
+        avaliacao_id = _save_avaliacao(
             usuario_id=usuario_id,
             ip_origem=ip_origem,
             condominio_id=condominio_id,
@@ -1828,7 +2260,13 @@ async def prever_preco(
             preco_m2_maximo=preco_m2_maximo,
             status="SUCESSO",
             mensagem_erro=None,
-            tempo_processamento_ms=elapsed_ms
+            tempo_processamento_ms=elapsed_ms,
+            guest_id=guest_id,
+            nome_predio_input=dados.Nome_Predio,
+        )
+
+        quota_payload = _build_quota_payload(
+            is_authenticated, used_today + 1, daily_limit
         )
 
         # ========== PASSO 5: RETORNAR RESPOSTA (inclui localização) ==========
@@ -1843,9 +2281,11 @@ async def prever_preco(
             Parques_800m=parques_800m,
             Latitude=latitude,
             Longitude=longitude,
-            status="sucesso"
+            status="sucesso",
+            avaliacao_id=avaliacao_id if is_authenticated else None,
+            quota=quota_payload,
         )
-        
+
     except HTTPException as he:
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         _save_avaliacao(
@@ -1862,7 +2302,9 @@ async def prever_preco(
             preco_m2_maximo=None,
             status="ERRO",
             mensagem_erro=str(he.detail),
-            tempo_processamento_ms=elapsed_ms
+            tempo_processamento_ms=elapsed_ms,
+            guest_id=guest_id,
+            nome_predio_input=dados.Nome_Predio,
         )
         raise
     except Exception as e:
@@ -1881,13 +2323,422 @@ async def prever_preco(
             preco_m2_maximo=None,
             status="ERRO",
             mensagem_erro=str(e),
-            tempo_processamento_ms=elapsed_ms
+            tempo_processamento_ms=elapsed_ms,
+            guest_id=guest_id,
+            nome_predio_input=dados.Nome_Predio,
         )
         print(f"✗ Erro na previsão: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Erro ao processar previsão: {str(e)}"
         )
+
+
+@app.get("/quota", tags=["Previsão"])
+async def quota_status(
+    request: Request,
+    response: Response,
+    current_user: dict | None = Depends(get_optional_user),
+):
+    """Retorna metadados de cota do dia para o chamador (auth ou guest)."""
+    is_authenticated = current_user is not None
+    usuario_id = int(current_user["id_usuario"]) if is_authenticated else None
+    guest_id = None if is_authenticated else _get_or_create_guest_id(request, response)
+    daily_limit = DAILY_LIMIT_AUTH if is_authenticated else DAILY_LIMIT_GUEST
+    used = _count_predictions_today(usuario_id, guest_id)
+    return _build_quota_payload(is_authenticated, used, daily_limit)
+
+
+def _row_to_avaliacao_dict(row) -> dict:
+    """Normaliza uma linha SQL de avaliacoes em dict serializável."""
+    d = dict(row)
+    # Datetime -> ISO
+    criado = d.get("criado_em")
+    if hasattr(criado, "isoformat"):
+        d["criado_em"] = criado.isoformat()
+    # Decimal/numpy -> float
+    for k in (
+        "area_util_m2", "valor_condominio_rs",
+        "preco_m2_minimo", "preco_m2_sugerido", "preco_m2_maximo",
+        "preco_total_minimo_rs", "preco_total_sugerido_rs", "preco_total_maximo_rs",
+    ):
+        if d.get(k) is not None:
+            try:
+                d[k] = float(d[k])
+            except (TypeError, ValueError):
+                pass
+    if "is_favorita" in d and d["is_favorita"] is not None:
+        d["is_favorita"] = bool(int(d["is_favorita"]))
+    return d
+
+
+_HISTORICO_SELECT = """
+    SELECT a.id_avaliacao, a.criado_em, a.status, a.is_favorita,
+           a.area_util_m2, a.valor_condominio_rs, a.quartos, a.vagas,
+           a.preco_m2_minimo, a.preco_m2_sugerido, a.preco_m2_maximo,
+           a.preco_total_minimo_rs, a.preco_total_sugerido_rs, a.preco_total_maximo_rs,
+           COALESCE(a.nome_predio_input, c.nome) AS nome_predio
+    FROM avaliacoes a
+    LEFT JOIN condominios c ON c.id_condominio = a.condominio_id
+"""
+
+
+@app.get("/historico", tags=["Histórico"])
+async def listar_historico(
+    request: Request,
+    limit: int = 20,
+    offset: int = 0,
+    favoritos_only: bool = False,
+    current_user: dict = Depends(get_current_user),
+):
+    """Lista paginada de previsões do usuário autenticado.
+
+    Apenas avaliações com status='SUCESSO'. ``favoritos_only=true`` filtra
+    apenas favoritadas.
+    """
+    if engine is None:
+        raise HTTPException(status_code=500, detail="Banco de dados indisponível")
+
+    limit = max(1, min(int(limit), 100))
+    offset = max(0, int(offset))
+    usuario_id = int(current_user["id_usuario"])
+
+    where_extra = " AND a.is_favorita = 1" if favoritos_only else ""
+    sql = (
+        _HISTORICO_SELECT
+        + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO'"
+        + where_extra
+        + " ORDER BY a.criado_em DESC LIMIT :limit OFFSET :offset"
+    )
+    count_sql = (
+        "SELECT COUNT(*) FROM avaliacoes a WHERE a.usuario_id = :uid "
+        "AND a.status = 'SUCESSO'" + where_extra
+    )
+    try:
+        with engine.connect() as conn:
+            total = conn.execute(text(count_sql), {"uid": usuario_id}).scalar() or 0
+            rows = conn.execute(
+                text(sql),
+                {"uid": usuario_id, "limit": limit, "offset": offset},
+            ).mappings().all()
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Erro ao listar histórico: {exc}")
+        raise HTTPException(status_code=500, detail="Erro ao consultar histórico.")
+
+    return {
+        "total": int(total),
+        "limit": limit,
+        "offset": offset,
+        "items": [_row_to_avaliacao_dict(r) for r in rows],
+    }
+
+
+@app.post("/favoritos/{avaliacao_id}", tags=["Histórico"])
+async def alternar_favorito(
+    avaliacao_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """Alterna o flag ``is_favorita`` de uma avaliação do usuário autenticado.
+
+    Garante que apenas o dono pode favoritar/desfavoritar.
+    """
+    if engine is None:
+        raise HTTPException(status_code=500, detail="Banco de dados indisponível")
+
+    usuario_id = int(current_user["id_usuario"])
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT id_avaliacao, usuario_id, is_favorita FROM avaliacoes "
+                    "WHERE id_avaliacao = :aid LIMIT 1"
+                ),
+                {"aid": int(avaliacao_id)},
+            ).first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Avaliação não encontrada.")
+            # Autorização: dono é a única chave de acesso (sem leak entre users)
+            if row[1] is None or int(row[1]) != usuario_id:
+                raise HTTPException(status_code=404, detail="Avaliação não encontrada.")
+            novo = 0 if int(row[2] or 0) == 1 else 1
+            conn.execute(
+                text("UPDATE avaliacoes SET is_favorita = :v WHERE id_avaliacao = :aid"),
+                {"v": novo, "aid": int(avaliacao_id)},
+            )
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Erro ao alternar favorito: {exc}")
+        raise HTTPException(status_code=500, detail="Erro ao atualizar favorito.")
+
+    return {"id_avaliacao": int(avaliacao_id), "is_favorita": bool(novo)}
+
+
+@app.get("/comparar", tags=["Histórico"])
+async def comparar_favoritas(
+    current_user: dict = Depends(get_current_user),
+):
+    """Retorna lista estruturada para comparar previsões favoritadas do usuário.
+
+    Resposta: ``{items:[...], campos:[...]}`` — itens contêm campos chave
+    (preços, área, quartos, vagas, condomínio) prontos para visualização
+    lado-a-lado no frontend.
+    """
+    if engine is None:
+        raise HTTPException(status_code=500, detail="Banco de dados indisponível")
+
+    usuario_id = int(current_user["id_usuario"])
+    sql = (
+        _HISTORICO_SELECT
+        + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO' AND a.is_favorita = 1"
+        + " ORDER BY a.criado_em DESC LIMIT 50"
+    )
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql), {"uid": usuario_id}).mappings().all()
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Erro ao comparar favoritas: {exc}")
+        raise HTTPException(status_code=500, detail="Erro ao comparar favoritas.")
+
+    campos = [
+        {"chave": "nome_predio", "label": "Imóvel"},
+        {"chave": "area_util_m2", "label": "Área útil (m²)"},
+        {"chave": "quartos", "label": "Quartos"},
+        {"chave": "vagas", "label": "Vagas"},
+        {"chave": "valor_condominio_rs", "label": "Condomínio (R$)"},
+        {"chave": "preco_m2_sugerido", "label": "R$/m² sugerido"},
+        {"chave": "preco_total_sugerido_rs", "label": "Total sugerido (R$)"},
+        {"chave": "preco_total_minimo_rs", "label": "Total mínimo (R$)"},
+        {"chave": "preco_total_maximo_rs", "label": "Total máximo (R$)"},
+        {"chave": "criado_em", "label": "Data"},
+    ]
+    return {
+        "campos": campos,
+        "items": [_row_to_avaliacao_dict(r) for r in rows],
+    }
+
+
+def _stream_csv(items: list[dict]) -> bytes:
+    buf = io.StringIO()
+    fieldnames = [
+        "id_avaliacao", "criado_em", "nome_predio", "area_util_m2", "quartos", "vagas",
+        "valor_condominio_rs",
+        "preco_m2_minimo", "preco_m2_sugerido", "preco_m2_maximo",
+        "preco_total_minimo_rs", "preco_total_sugerido_rs", "preco_total_maximo_rs",
+        "is_favorita",
+    ]
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for it in items:
+        writer.writerow({k: ("" if it.get(k) is None else it.get(k)) for k in fieldnames})
+    return buf.getvalue().encode("utf-8-sig")  # BOM para Excel pt-BR
+
+
+@app.get("/export/csv", tags=["Histórico"])
+async def exportar_csv(
+    favoritos_only: bool = False,
+    current_user: dict = Depends(get_current_user),
+):
+    """Exporta histórico do usuário como CSV (UTF-8 com BOM)."""
+    if engine is None:
+        raise HTTPException(status_code=500, detail="Banco de dados indisponível")
+
+    usuario_id = int(current_user["id_usuario"])
+    where_extra = " AND a.is_favorita = 1" if favoritos_only else ""
+    sql = (
+        _HISTORICO_SELECT
+        + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO'"
+        + where_extra
+        + " ORDER BY a.criado_em DESC LIMIT 1000"
+    )
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql), {"uid": usuario_id}).mappings().all()
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Erro ao exportar CSV: {exc}")
+        raise HTTPException(status_code=500, detail="Erro ao exportar CSV.")
+
+    items = [_row_to_avaliacao_dict(r) for r in rows]
+    csv_bytes = _stream_csv(items)
+    filename = f"prevismob_historico_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        io.BytesIO(csv_bytes),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ----------------------------------------------------------------------------
+# Gerador de PDF mínimo (sem dependência externa)
+# ----------------------------------------------------------------------------
+# Trade-off: evitamos adicionar reportlab/fpdf para manter a stack enxuta. O
+# gerador abaixo emite um PDF text-only single-stream válido (PDF 1.4) — o
+# bastante para um relatório de histórico. Não suporta encoding fora do
+# WinAnsi/PDFDocEncoding (sem acentos exóticos), portanto sanitizamos via
+# `_pdf_sanitize`.
+
+_PDF_FONT_OBJ = (
+    b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
+)
+
+
+def _pdf_sanitize(s: str) -> str:
+    if s is None:
+        return ""
+    repl = {
+        "ã": "a", "á": "a", "â": "a", "à": "a", "ä": "a",
+        "Ã": "A", "Á": "A", "Â": "A", "À": "A",
+        "é": "e", "ê": "e", "è": "e", "É": "E", "Ê": "E",
+        "í": "i", "Í": "I",
+        "ó": "o", "ô": "o", "õ": "o", "Ó": "O", "Ô": "O", "Õ": "O",
+        "ú": "u", "ü": "u", "Ú": "U",
+        "ç": "c", "Ç": "C",
+        "²": "2", "—": "-", "–": "-", "“": '"', "”": '"', "’": "'",
+    }
+    out = "".join(repl.get(ch, ch) for ch in str(s))
+    return out.encode("latin-1", "ignore").decode("latin-1")
+
+
+def _build_simple_pdf(title: str, lines: list[str]) -> bytes:
+    """Gera um PDF 1.4 text-only de uma página, multi-linhas (auto-paginação)."""
+    PAGE_W, PAGE_H = 595, 842  # A4 pt
+    MARGIN_X, MARGIN_TOP, LINE = 50, 50, 14
+    max_lines_per_page = (PAGE_H - 2 * MARGIN_TOP) // LINE
+
+    def _escape(s: str) -> str:
+        return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    pages: list[list[str]] = []
+    page: list[str] = [_pdf_sanitize(title), ""]
+    for ln in lines:
+        if len(page) >= max_lines_per_page:
+            pages.append(page)
+            page = []
+        page.append(_pdf_sanitize(ln))
+    if page:
+        pages.append(page)
+
+    objects: list[bytes] = []
+
+    def add_obj(body: bytes) -> int:
+        objects.append(body)
+        return len(objects)
+
+    # Reserve order: 1=catalog, 2=pages, 3=font, then per-page (page+content)
+    catalog_id = add_obj(b"")  # placeholder
+    pages_id = add_obj(b"")
+    font_id = add_obj(_PDF_FONT_OBJ)
+
+    page_ids: list[int] = []
+    content_ids: list[int] = []
+    for plines in pages:
+        stream_lines = [b"BT", b"/F1 11 Tf", f"1 0 0 1 {MARGIN_X} {PAGE_H - MARGIN_TOP} Tm".encode()]
+        for i, ln in enumerate(plines):
+            if i > 0:
+                stream_lines.append(f"0 -{LINE} Td".encode())
+            stream_lines.append(f"({_escape(ln)}) Tj".encode())
+        stream_lines.append(b"ET")
+        stream = b"\n".join(stream_lines)
+        content_id = add_obj(
+            f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"\nendstream"
+        )
+        content_ids.append(content_id)
+        page_ids.append(0)  # placeholder, will fix after we know id
+
+    # Now allocate page object ids
+    real_page_ids = []
+    for i, content_id in enumerate(content_ids):
+        page_obj = (
+            f"<< /Type /Page /Parent {pages_id} 0 R "
+            f"/MediaBox [0 0 {PAGE_W} {PAGE_H}] "
+            f"/Resources << /Font << /F1 {font_id} 0 R >> >> "
+            f"/Contents {content_id} 0 R >>"
+        ).encode()
+        pid = add_obj(page_obj)
+        real_page_ids.append(pid)
+
+    # Fill catalog and pages
+    pages_kids = " ".join(f"{pid} 0 R" for pid in real_page_ids)
+    objects[pages_id - 1] = (
+        f"<< /Type /Pages /Count {len(real_page_ids)} /Kids [ {pages_kids} ] >>"
+    ).encode()
+    objects[catalog_id - 1] = f"<< /Type /Catalog /Pages {pages_id} 0 R >>".encode()
+
+    # Assemble PDF
+    out = io.BytesIO()
+    out.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]  # object 0 placeholder
+    for i, body in enumerate(objects, start=1):
+        offsets.append(out.tell())
+        out.write(f"{i} 0 obj\n".encode())
+        out.write(body)
+        out.write(b"\nendobj\n")
+    xref_pos = out.tell()
+    out.write(f"xref\n0 {len(objects) + 1}\n".encode())
+    out.write(b"0000000000 65535 f \n")
+    for off in offsets[1:]:
+        out.write(f"{off:010d} 00000 n \n".encode())
+    out.write(
+        f"trailer\n<< /Size {len(objects) + 1} /Root {catalog_id} 0 R >>\n".encode()
+    )
+    out.write(f"startxref\n{xref_pos}\n%%EOF".encode())
+    return out.getvalue()
+
+
+@app.get("/export/pdf", tags=["Histórico"])
+async def exportar_pdf(
+    favoritos_only: bool = False,
+    current_user: dict = Depends(get_current_user),
+):
+    """Exporta histórico do usuário em PDF text-only (sem dependência externa)."""
+    if engine is None:
+        raise HTTPException(status_code=500, detail="Banco de dados indisponível")
+
+    usuario_id = int(current_user["id_usuario"])
+    where_extra = " AND a.is_favorita = 1" if favoritos_only else ""
+    sql = (
+        _HISTORICO_SELECT
+        + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO'"
+        + where_extra
+        + " ORDER BY a.criado_em DESC LIMIT 200"
+    )
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql), {"uid": usuario_id}).mappings().all()
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Erro ao exportar PDF: {exc}")
+        raise HTTPException(status_code=500, detail="Erro ao exportar PDF.")
+
+    items = [_row_to_avaliacao_dict(r) for r in rows]
+    titulo = "PrevIsmob — Histórico de Avaliações"
+    if favoritos_only:
+        titulo += " (favoritas)"
+
+    lines = [
+        f"Usuário: {current_user.get('nome') or current_user.get('email')}",
+        f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        f"Total de avaliações: {len(items)}",
+        "",
+    ]
+    for it in items:
+        criado = (it.get("criado_em") or "").replace("T", " ")[:16]
+        nome = it.get("nome_predio") or "—"
+        area = it.get("area_util_m2") or 0
+        sug_total = it.get("preco_total_sugerido_rs") or 0
+        m2 = it.get("preco_m2_sugerido") or 0
+        fav = "★" if it.get("is_favorita") else " "
+        lines.append(
+            f"{fav} [{criado}] {nome} | {area:.0f} m² | "
+            f"R$/m² {m2:,.2f} | Total R$ {sug_total:,.2f}"
+        )
+
+    pdf_bytes = _build_simple_pdf(titulo, lines)
+    filename = f"prevismob_historico_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/status", tags=["Info"])
@@ -1911,7 +2762,9 @@ async def status():
         "caminho_dataset": CSV_PATH,
         "caminho_modelo": MODEL_PATH,
         "endpoints_disponiveis": [
-            "/", "/status", "/condominio", "/prever", "/docs"
+            "/", "/status", "/condominio", "/prever", "/quota",
+            "/historico", "/favoritos/{id}", "/comparar",
+            "/export/csv", "/export/pdf", "/docs"
         ]
     }
 

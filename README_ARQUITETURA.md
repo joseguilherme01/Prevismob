@@ -1,143 +1,418 @@
-# 🏠 PrevIsmob - Arquitetura Client-Server (V2)
+# PrevIsmob — Arquitetura
 
-> Sistema de Previsão de Preços de Imóveis em Águas Claras  
-> Migrado para Arquitetura Client-Server com Geocoding em Tempo Real via Google Maps
-
----
-
-## 📋 Visão Geral
-
-O projeto agora utiliza uma arquitetura **Client-Server** com separação clara entre:
-
-- **Backend**: API FastAPI (Python) - roda na porta `8000` e usa Google Maps para geocoding em tempo real e cálculo de proximidades.
-- **Frontend**: HTML5 + JavaScript - qualquer servidor web (ou arquivo local).
-- **Modelo ML**: Scikit-Learn (Random Forest via joblib) - `modelo_imoveis.pkl`.
+Documento técnico sobre a estrutura interna do PrevIsmob, fluxos de navegação, contrato dos endpoints e decisões de projeto. Para visão geral e setup, ver [README.md](README.md). Para testes, ver [README_TESTES.md](README_TESTES.md).
 
 ---
 
-## 🗂️ Estrutura de Arquivos
+## Sumário
+
+- [Objetivo da arquitetura](#objetivo-da-arquitetura)
+- [Componentes](#componentes)
+- [Estrutura de pastas](#estrutura-de-pastas)
+- [Fluxos de navegação e estado](#fluxos-de-navegação-e-estado)
+- [Fluxo de quota](#fluxo-de-quota)
+- [Histórico inline (app)](#histórico-inline-app)
+- [Endpoints principais](#endpoints-principais)
+- [Modelo de dados](#modelo-de-dados)
+- [Versionamento de API](#versionamento-de-api)
+- [Decisões técnicas](#decisões-técnicas)
+- [Segurança](#segurança)
+- [Observabilidade](#observabilidade)
+- [Pontos de atenção para manutenção](#pontos-de-atenção-para-manutenção)
+
+---
+
+## Objetivo da arquitetura
+
+- Separar **frontend estático** de **backend de domínio** para permitir deploy independente.
+- Concentrar regras de negócio (cotas, auth, persistência, modelagem) no backend, mantendo o frontend "burro" — apenas UI + chamadas REST.
+- Permitir uso público (guest) com fricção mínima e habilitar features ricas (histórico, favoritos, export) apenas após autenticação verificada.
+- Reaproveitar dados externos (Google Maps) por requisição, sem armazenar coordenadas estáticas no frontend.
+
+---
+
+## Componentes
+
+```
+┌────────────────────────────── Frontend (estático) ──────────────────────────────┐
+│                                                                                 │
+│   index.html  ─►  #landing-section   (público; sem histórico inline)            │
+│                ─►  #app-section       (formulário + resultado + histórico)      │
+│   script.js   ─►  estado client-side (auth, cota, intent pós-login)             │
+│   style.css   ─►  tema único, mobile-first                                      │
+└────────────────────────────────────┬────────────────────────────────────────────┘
+                                     │ fetch JSON + cookie httpOnly (guest_id)
+                                     ▼
+┌────────────────────────────── Backend FastAPI ──────────────────────────────────┐
+│   api.py                                                                        │
+│   ├── /auth/*           → registro, verificação, login, refresh, logout, me     │
+│   ├── /prever           → orquestra Maps + ML + persistência + cota             │
+│   ├── /quota            → estado atual da cota (guest/auth)                     │
+│   ├── /historico        → lista avaliações do usuário                           │
+│   ├── /favoritos/{id}   → toggle de favorito                                    │
+│   ├── /comparar         → múltiplas avaliações lado a lado                      │
+│   ├── /export/{csv,pdf} → exportação                                            │
+│   ├── /condominio       → autocomplete (CSV legado)                             │
+│   └── /, /status, /docs → metadados                                             │
+│                                                                                 │
+│   db.py             → engine SQLAlchemy (MySQL)                                 │
+│   email_service.py  → tokens de verificação + envio (SMTP ou dev-mode)          │
+│   modelo_imoveis.pkl → estimador scikit-learn carregado via joblib              │
+└────────────────────────────────────┬────────────────────────────────────────────┘
+                                     │
+                  ┌──────────────────┼──────────────────┐
+                  ▼                  ▼                  ▼
+           Google Maps API       MySQL 8.x         Filesystem
+        (Geocoding + Places)   (usuários, sessões,  (modelo .pkl,
+                                avaliações,         CSVs auxiliares)
+                                condomínios,
+                                features, modelos)
+```
+
+---
+
+## Estrutura de pastas
 
 ```text
 Prevismob/
-├── api.py                          # Backend FastAPI + Integração Google Maps
-├── treinar_ia.py                   # Script de treinamento do modelo ML
-├── index.html                      # Frontend UI (HTML5 + CSS)
-├── script.js                       # Frontend Lógica (JavaScript)
-├── modelo_imoveis.pkl              # Modelo treinado (Scikit-Learn)
-├── requirements.txt                # Dependências Python
-├── .env                            # Variáveis de ambiente (Chaves de API)
-└── README_ARQUITETURA.md           # Este arquivo
-🚀 Como ExecutarNota: a partir da versão atual a previsão depende de uma chave válida doGoogle Maps. Crie um arquivo .env na raiz com:PlaintextMaps_API_KEY=SEU_TOKEN_AQUI
-1️⃣ Instalar DependênciasBash# No diretório do projeto
-pip install -r requirements.txt
-Se requirements.txt não existir, instale manualmente:Bashpip install fastapi uvicorn joblib pandas scikit-learn googlemaps python-dotenv
-2️⃣ Iniciar o Backend (API FastAPI)Bash# Terminal 1 - Abra PowerShell ou CMD e navegue até a pasta do projeto
-cd c:\Users\Meu Computador\OneDrive\Área de Trabalho\Prevismob
-
-# Execute o servidor
-python api.py
-Você verá algo assim:Plaintext============================================================
-🚀 Iniciando PrevIsmob API
-============================================================
-📍 URL: http://localhost:8000
-📚 Documentação: http://localhost:8000/docs
-============================================================
-INFO:     Application startup complete
-INFO:     Uvicorn running on [http://0.0.0.0:8000](http://0.0.0.0:8000) (Press CTRL+C to quit)
-3️⃣ Abrir o Frontend (HTML)Opção A: Abrir arquivo local diretamenteBash# Terminal 2 - Simplesmente abra o arquivo no navegador
-start index.html
-Opção B: Subir um servidor web local (recomendado)Bash# Terminal 2 - Com Python
-python -m http.server 8001
-
-# Ou com Node.js (se tiver instalado)
-npx http-server -p 8001
-
-# Depois abra: http://localhost:8001
-🔌 Fluxo de DadosPlaintext┌─────────────────────────────────────────────────────────┐
-│                    NAVEGADOR (Frontend)                 │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  index.html (UI com formulário)                  │   │
-│  │  + script.js (lógica + validação)                │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-                            ↕ (JSON POST via script.js)
-                  http://localhost:8000/prever
-                            ↕ (JSON Response)
-┌─────────────────────────────────────────────────────────┐
-│                    SERVIDOR (Backend)                   │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  api.py (FastAPI)                                │   │
-│  │  ├─ Valida dados com Pydantic                    │   │
-│  │  ├─ 🌍 Busca Localização/Distâncias no Google Maps│   │
-│  │  ├─ Converte para DataFrame                      │   │
-│  │  ├─ Passa no modelo ML (sklearn)                 │   │
-│  │  └─ Retorna preço por m² e dados de geolocalização│   │
-│  │                                                  │   │
-│  │  modelo_imoveis.pkl (Scikit-Learn)               │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-📊 Variáveis do Modelo MLO modelo espera exatamente estas 7 colunas numéricas (agora montadas automaticamente pelo backend a partir do endereço):CampoTipoOrigemDescriçãoExemploQuartosfloatInputNúmero de quartos3VagasfloatInputVagas de garagem2Condominio_m2floatCalculadoValor condomínio por m²400.0Distancia_Metro_kmfloatMaps APIDistância até metrô (km)0.8Mercados_500mfloatMaps APIMercados dentro de 500m2Escolas_1000mfloatMaps APIEscolas dentro de 1000m3Parques_800mfloatMaps APIParques dentro de 800m1🔑 Cálculos Importantes1. Cálculo de Condominio_m2 (Frontend - script.js)JavaScript// O usuário fornece:
-// - area = 120 m²
-// - valorCondominio = 48000 R$ (ou 650 R$ na versão mensal)
-
-// O código calcula:
-const condominioM2 = valorCondominio / area;
-// 48000 / 120 = 400.0
-2. Cálculo do Preço Total (Frontend - script.js)JavaScript// API retorna: preco_m2_sugerido = 8500.0 R$/m²
-// Usuário forneceu: area = 120 m²
-
-// Cálculo final:
-const precoTotal = preco_m2_sugerido * area;
-// 8500.0 * 120 = 1.020.000 R$
-🔗 API EndpointsPOST /preverPrediz o preço do imóvel baseado nas características do imóvel e na
-localização obtida em tempo real via Google Maps.O backend monta automaticamente as métricas de proximidade (metrô,mercados, escolas, parques) após converter o endereço em coordenadas.Não é mais necessário fornecer manualmente Distancia_Metro_km,Mercados_500m, etc. Basta enviar o nome/endereço (campo Nome_Predio) eas dimensões básicas do imóvel.Request de exemplo (usando o modelo de entrada do frontend):JSON{
-  "Nome_Predio": "Residencial Portal das Araucarias",
-  "Area_Util": 120,
-  "Valor_Condominio": 650,
-  "Quartos": 3,
-  "Vagas": 2
-}
-O response agora também inclui o nome da estação de metrô mais próximano campo metro_nome, além das demais métricas de localização.Response (Sucesso):JSON{
-  "preco_m2_sugerido": 8500.0,
-  "Distancia_Metro_km": 0.45,
-  "metro_nome": "Estação Águas Claras",
-  "status": "sucesso"
-}
-Response (Erro):JSON{
-  "preco_m2_sugerido": 0,
-  "status": "erro - modelo não disponível ou limite da API Maps excedido"
-}
-GET /Retorna informações da API.GET /statusVerifica se o modelo está carregado.GET /docsDocumentação interativa (Swagger UI).🐛 Troubleshooting❌ Erro: "Não consigo conectar no servidor"Solução:Verifique se o backend está rodando:Bash# Terminal 1 deve estar com a API rodando
-python api.py
-Verifique se a porta 8000 está aberta:Bash# PowerShell
-netstat -ano | findstr :8000
-# Se houver algo na porta, o servidor está rodando
-Tente acessar a API diretamente:http://localhost:8000/
-❌ Erro: "Modelo não encontrado"Solução:Certifique-se que modelo_imoveis.pkl está na mesma pasta de api.py.Verifique o nome exato do arquivo (case-sensitive).Verifique a saída do servidor (deve mostrar se carregou ou não).❌ CORS Error no consoleSolução:A API já tem CORS configurado para aceitar "*". Se ainda tiver erro:Abra o navegador em http://localhost:8001 (não arquivo local).Verifique a URL da API em script.js - deve ser http://localhost:8000.❌ Dados não estão sendo enviadosSolução:Abra DevTools (F12) → Console.Verifique se há mensagens de erro.Verifique se todos os campos do formulário estão preenchidos.Tente preencher com valores válidos (números positivos).🧪 Testar a API com cURLComo o Backend agora se comunica com o Maps, envie apenas os dados do prédio:Bash# Windows PowerShell
-$dados = @{
-    Nome_Predio = "Residencial Portal das Araucarias"
-    Area_Util = 68.0
-    Quartos = 2
-    Vagas = 1
-    Valor_Condominio = 650.0
-} | ConvertTo-Json
-
-Invoke-WebRequest `
-  -Uri "http://localhost:8000/prever" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Body $dados
-🔐 Notas de Segurança⚠️ Desenvolvimento:CORS aberto para "*" ✅ (OK para dev)Servidor em 0.0.0.0 ✅ (OK para dev)🔒 Produção (TODO):[ ] Restringir CORS para domínios específicos[ ] Adicionar autenticação/API keys[ ] Usar HTTPS[ ] Validar e sanitizar inputs[ ] Rate limiting[ ] Logging e monitoramento📦 DependênciasPlaintextfastapi==0.104.0
-uvicorn==0.24.0
-pydantic==2.4.0
-joblib==1.3.2
-pandas==2.1.1
-scikit-learn==1.3.2
-googlemaps>=4.10.0
-python-dotenv>=1.0.0
-Instalar todas:Bashpip install -r requirements.txt
-📝 Arquivos Explicadosapi.py✅ Backend com FastAPI  ✅ Integração com Google Maps API em tempo real✅ Carrega modelo com joblib  ✅ Rota /prever para previsões  ✅ Documentação automática em /docs  ✅ Tratamento de erros robustotreinar_ia.py✅ Separa os dados de treino (80%) e teste (20%)✅ Limpa dados vazios dinamicamente✅ Treina a IA (Random Forest) com 7 variáveis geolocalizadas✅ Salva o modelo_imoveis.pkl na raizindex.html✅ HTML5 semântico  ✅ Design moderno com tema escuro  ✅ CSS inline para facilitar distribuição  ✅ Formulário intuitivo com validação  ✅ Seção de resultados dinâmicascript.js✅ Validação de campos  ✅ Cálculo correto de Condominio_m2  ✅ Requisição à API com tratamento de erros  ✅ Formatação de moeda (Real)  ✅ Mensagens amigáveis ao usuário  ✅ Suporte a scroll suave💡 Melhorias Futuras[ ] Visão Computacional (Nível Advanced): Integrar a API do Google Cloud Vision para analisar fotos do Street View da fachada dos prédios e cruzar com os dados de localização.[ ] Sistema de Cache Local: Salvar requisições feitas ao Google Maps em um SQLite para economizar cota.[ ] Autenticação OAuth2[ ] Base de dados para histórico de previsões[ ] Gráficos de tendência[ ] Exportar resultados em PDF[ ] Deploy em cloud (Heroku, AWS, etc)👨‍💻 DesenvolvedorPrevIsmob v2.0 - Arquitetura Client-Server  Baseado em Machine Learning (Scikit-Learn) e Google Maps.📞 SuporteSe tiver problemas:Verifique o console (F12) no navegadorVerifique o terminal do servidorCertifique-se que modelo está em modelo_imoveis.pklTeste os endpoints em http://localhost:8000/docsÚltima atualização: Março 2026  Status: ✅ Pronto para Produção (com ajustes de segurança)
-Olha bem as seções `Troubleshooting`, `Notas de Segurança`, `Dependências` e `Arquivos Explicados`. Todas elas voltaram para a forma exata e super detalhada que você tinha escrito originalmente.
-
-Pode me dizer se agora ficou 100% igual à sua visão?
+├── api.py                         # Backend FastAPI (rotas + regras de negócio)
+├── db.py                          # Engine SQLAlchemy básica (utilitário)
+├── email_service.py               # Tokens + envio de e-mail de verificação
+├── modelo_imoveis.pkl             # Modelo ML treinado (joblib)
+├── treinar_ia.py                  # Script de treino offline
+├── index.html                     # SPA leve (landing + app numa mesma página)
+├── script.js                      # Estado client-side e integração com a API
+├── style.css                      # Tema visual
+├── requirements.txt               # Dependências de runtime da API
+├── requirements-train.txt         # Dependências extras para treino/scripts
+├── data/
+│   └── dataset_aguas_claras_completo.csv
+├── processamento/                 # Datasets intermediários (offline)
+├── scripts/                       # Coletores e utilitários offline
+├── migrations/                    # SQLs idempotentes (também aplicadas em runtime)
+└── tests/                         # Suite pytest
 ```
+
+---
+
+## Fluxos de navegação e estado
+
+### Landing vs. App
+
+`index.html` contém duas regiões mutuamente exclusivas:
+
+- `#landing-section` — pública, sem histórico, sem dados sensíveis.
+- `#app-section` — página de previsão; aloja o formulário, o resultado e o **histórico inline** (apenas para usuários autenticados).
+
+`script.js` alterna entre elas via `mostrarLanding()` / `mostrarApp()`. A landing é sempre o ponto de entrada padrão.
+
+### Guest vs. Auth
+
+| Estado | Identificação                                                          | Cota             | Recursos disponíveis                                   |
+| ------ | ---------------------------------------------------------------------- | ---------------- | ------------------------------------------------------ |
+| Guest  | Cookie `prevismob_guest_id` (UUID v4, httpOnly) ou fallback hash IP+UA | 2 previsões/dia  | `/prever`, `/quota`, `/condominio`                     |
+| Auth   | JWT Bearer (access 15min) + refresh (7d, hash em `sessoes`)            | 10 previsões/dia | Tudo do guest + histórico, favoritos, comparar, export |
+
+A landing detecta o estado pela presença/validade do access token e ajusta a navbar (`data-auth-state="guest|auth"`).
+
+### Pós-login por intenção
+
+Após login bem-sucedido, o frontend usa a variável `pendingPostLoginNext` para decidir o destino:
+
+- `next = "landing"` (default) — usuário fez login a partir da landing pública e volta para a **landing logada** (com nav atualizada). Comportamento esperado quando o login é casual e o usuário ainda não decidiu prever nada.
+- `next = "app"` — usuário acionou o login após tentar uma ação que exige autenticação (ex.: clicou em **Avaliar Imóvel** sem estar logado, ou recarregou a página enquanto estava no app). Após o login, o frontend leva-o direto para `#app-section`.
+
+> Trecho de referência em [`script.js`](script.js#L242-L274). Tokens inválidos/expirados não derrubam a landing pública: `get_optional_user` no backend retorna `None` silenciosamente.
+
+---
+
+## Fluxo de quota
+
+- **Guest:** 2 previsões com `status='SUCESSO'` por dia, contadas por `guest_id`.
+- **Auth:** 10 previsões com `status='SUCESSO'` por dia, contadas por `usuario_id`.
+- "Dia" = `CURDATE()` no MySQL (timezone do servidor).
+- **Falhas não consomem cota.** Apenas inserts com `status='SUCESSO'` em `avaliacoes` contam.
+- Quando excedida:
+  - HTTP **429** com payload `{daily_limit, used_today, remaining_today, limit_reached: true, ...}`.
+  - Header `Retry-After` com segundos até a próxima meia-noite do servidor.
+- Endpoint `/quota` retorna o mesmo payload sem efetuar previsão — usado para hidratar o badge na UI.
+- Após login, o frontend **re-busca `/quota`** para sincronizar o badge (o limite muda de 2 para 10 instantaneamente).
+
+Configurável via `DAILY_LIMIT_GUEST` e `DAILY_LIMIT_AUTH` no `.env`.
+
+---
+
+## Histórico inline (app)
+
+- Renderizado **apenas dentro de `#app-section`**. Em `#landing-section` a UI não monta o componente — é uma defesa em profundidade contra vazamento entre estados.
+- Endpoint backing: `GET /historico` (auth obrigatória).
+- Cada item permite:
+  - Marcar/desmarcar favorito → `POST /favoritos/{avaliacao_id}` (toggle).
+  - Selecionar para comparação → `GET /comparar?ids=...`.
+  - Exportar a lista visível em CSV/PDF → `GET /export/csv` ou `/export/pdf`.
+
+---
+
+## Endpoints principais
+
+| Método   | Rota                         | Auth                       | Propósito                                                          |
+| -------- | ---------------------------- | -------------------------- | ------------------------------------------------------------------ |
+| `POST`   | `/auth/register`             | Pública                    | Cria usuário + envia e-mail de verificação.                        |
+| `GET`    | `/auth/verificar-email`      | Pública (token na query)   | Marca conta como verificada.                                       |
+| `POST`   | `/auth/reenviar-verificacao` | Pública                    | Reenvia link (cooldown configurável).                              |
+| `POST`   | `/auth/login`                | Pública                    | Retorna access + refresh; bloqueia se não verificado.              |
+| `POST`   | `/auth/refresh`              | Pública (com refresh)      | Rotaciona refresh + emite novo access.                             |
+| `POST`   | `/auth/logout`               | Pública (com refresh)      | Revoga sessão.                                                     |
+| `GET`    | `/auth/me`                   | Bearer                     | Dados do usuário corrente.                                         |
+| `DELETE` | `/auth/me`                   | Bearer                     | Exclusão (anonimização) da conta do usuário autenticado.           |
+| `GET`    | `/`                          | Pública                    | Metadados da API.                                                  |
+| `GET`    | `/status`                    | Pública                    | Indica se o modelo carregou.                                       |
+| `GET`    | `/condominio`                | Pública                    | Autocomplete de nomes (dataset CSV).                               |
+| `POST`   | `/prever`                    | Opcional (Bearer ou guest) | Previsão; consome cota; persiste em `avaliacoes` se DB disponível. |
+| `GET`    | `/quota`                     | Opcional                   | Estado da cota (auth ou guest).                                    |
+| `GET`    | `/historico`                 | Bearer                     | Avaliações do usuário corrente.                                    |
+| `POST`   | `/favoritos/{avaliacao_id}`  | Bearer                     | Toggle favorito.                                                   |
+| `GET`    | `/comparar`                  | Bearer                     | Compara avaliações por IDs.                                        |
+| `GET`    | `/export/csv`                | Bearer                     | Histórico em CSV.                                                  |
+| `GET`    | `/export/pdf`                | Bearer                     | Histórico em PDF.                                                  |
+| `GET`    | `/docs`                      | Pública                    | Swagger UI.                                                        |
+
+> A lista exata de parâmetros e schemas Pydantic está em `/docs` (gerado a partir do código). Quando houver dúvida, **verifique no código**: `api.py`.
+
+---
+
+## Modelo de dados
+
+O backend persiste em **MySQL 8.x** (engine `InnoDB`, charset `utf8mb4_unicode_ci`). O schema completo, exportado diretamente do banco em uso, encontra-se em [docs/db/schema.sql](docs/db/schema.sql) e é a **única fonte de verdade** desta seção. As migrações em [migrations/](migrations/) cobrem apenas alterações incrementais aplicadas após a criação inicial do schema.
+
+### Diagrama entidade-relacionamento
+
+```mermaid
+erDiagram
+    PLANOS ||--o{ USUARIOS : "define limite"
+    USUARIOS ||--o{ SESSOES : "possui"
+    USUARIOS ||--o{ AVALIACOES : "solicita"
+    CONDOMINIOS ||--o{ AVALIACOES : "referencia"
+    MODELOS_ML ||--o{ AVALIACOES : "produz"
+    CONDOMINIOS ||--o{ CARACTERISTICAS_LOCALIZACAO : "enriquece"
+
+    PLANOS {
+        tinyint id_plano PK
+        varchar nome
+        int limite_previsoes_dia
+    }
+    USUARIOS {
+        bigint id_usuario PK
+        varchar email UK
+        varchar senha_hash
+        tinyint plano_id FK
+        enum papel
+        tinyint ativo
+        datetime email_verificado_em
+        varchar email_verificacao_token_hash UK
+        datetime email_verificacao_expira_em
+        datetime ultimo_login_em
+    }
+    SESSOES {
+        bigint id_sessoes PK
+        bigint usuario_id FK
+        varchar token_refresh_hash
+        varchar agente_usuario
+        varchar ip_origem
+        datetime expira_em
+        datetime revogado_em
+    }
+    CONDOMINIOS {
+        bigint id_condominio PK
+        varchar nome
+        varchar chave_normalizada UK
+        varchar cidade
+        char uf
+    }
+    CARACTERISTICAS_LOCALIZACAO {
+        bigint id_caracteristicas_localizacao PK
+        bigint condominio_id FK
+        decimal latitude
+        decimal longitude
+        varchar nome_metro
+        decimal distancia_metro_km
+        int mercados_500m
+        int escolas_1000m
+        int parques_800m
+        enum fonte_dado
+        datetime expira_em
+    }
+    MODELOS_ML {
+        bigint id_modelos_ml PK
+        varchar nome_modelo
+        varchar versao
+        varchar caminho_arquivo
+        tinyint ativo
+    }
+    AVALIACOES {
+        bigint id_avaliacoes PK
+        bigint usuario_id FK
+        varchar guest_id
+        bigint condominio_id FK
+        bigint modelo_id FK
+        decimal area_util_m2
+        int quartos
+        int vagas
+        decimal preco_sugerido_rs
+        decimal preco_total_sugerido_rs
+        enum status
+        tinyint is_favorita
+        varchar nome_predio_input
+        datetime criado_em
+    }
+```
+
+### Tabelas e finalidade funcional
+
+| Tabela                        | Finalidade                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `planos`                      | Catálogo de planos de uso. O campo `limite_previsoes_dia` parametriza a cota diária associada ao usuário e substitui valores hard-coded no backend.                                                                                                                                                                               |
+| `usuarios`                    | Identidade e credenciais. Centraliza autenticação (`senha_hash`), autorização (`papel`), estado de ativação (`ativo`), verificação de e-mail (`email_verificacao_token_hash`, `..._expira_em`) e telemetria de login.                                                                                                             |
+| `sessoes`                     | Sessões de refresh token. Armazena apenas o **hash** do refresh token (`token_refresh_hash`), com janela de validade (`expira_em`) e marcação de revogação (`revogado_em`) para suportar logout e LGPD.                                                                                                                           |
+| `condominios`                 | Catálogo de empreendimentos avaliados. `chave_normalizada` (UNIQUE) viabiliza deduplicação determinística entre variações de digitação.                                                                                                                                                                                           |
+| `caracteristicas_localizacao` | Cache de enriquecimento geográfico (Google Maps) por condomínio. `fonte_dado` rastreia a procedência (`google`, `manual`, `importacao`) e `expira_em` permite invalidação programada do cache.                                                                                                                                    |
+| `modelos_ml`                  | Registro dos modelos de regressão disponíveis. A combinação (`nome_modelo`, `versao`) é única; `ativo` permite alternar versões sem remoção física do registro.                                                                                                                                                                   |
+| `avaliacoes`                  | Fato central da aplicação. Persiste cada previsão (entrada do usuário, faixas de preço estimadas, status, tempo de processamento) e dá suporte simultâneo a histórico, favoritos e contagem de cota.                                                                                                                              |
+| `avaliacoes_backup_20260425`  | Snapshot histórico da tabela `avaliacoes` anterior à migração de 25/04/2026 ([2026_04_25_quotas_favoritos.sql](migrations/2026_04_25_quotas_favoritos.sql)). Não possui chave primária nem FKs, não é lida pela aplicação e existe exclusivamente como salvaguarda de auditoria — pode ser descartada após validação em produção. |
+
+### Relacionamentos (chaves estrangeiras)
+
+Todas as FKs declaradas no schema usam `ON DELETE RESTRICT ON UPDATE CASCADE`, ou seja, **registros referenciados não podem ser apagados** enquanto houver dependentes — comportamento intencional para preservar histórico e auditoria.
+
+| Origem                                      | Destino                     | Constraint                 |
+| ------------------------------------------- | --------------------------- | -------------------------- |
+| `usuarios.plano_id`                         | `planos.id_plano`           | `fk_usuarios_plano`        |
+| `sessoes.usuario_id`                        | `usuarios.id_usuario`       | `fk_sessoes_usuario`       |
+| `avaliacoes.usuario_id`                     | `usuarios.id_usuario`       | `fk_avaliacoes_usuario`    |
+| `avaliacoes.condominio_id`                  | `condominios.id_condominio` | `fk_avaliacoes_condominio` |
+| `avaliacoes.modelo_id`                      | `modelos_ml.id_modelos_ml`  | `fk_avaliacoes_modelo`     |
+| `caracteristicas_localizacao.condominio_id` | `condominios.id_condominio` | `fk_caraclocal_condominio` |
+
+`avaliacoes.usuario_id` é **anulável** (`DEFAULT NULL`) para acomodar previsões em modo guest, identificadas por `guest_id` (UUID em cookie httpOnly) em vez de FK.
+
+### Índices principais
+
+Os índices abaixo, definidos em `CREATE TABLE`, sustentam consultas críticas do caminho quente da aplicação:
+
+| Tabela        | Índice                                                  | Função                                                                             |
+| ------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `usuarios`    | `uk_usuarios_email` (UNIQUE)                            | Garante unicidade do e-mail e acelera login.                                       |
+| `usuarios`    | `ux_usuarios_email_verif_hash` (UNIQUE)                 | Lookup O(1) do token de verificação de e-mail e proteção contra colisão de hashes. |
+| `sessoes`     | `idx_sessoes_usuario_id`                                | Listagem e revogação de sessões por usuário (logout, exclusão de conta).           |
+| `condominios` | `uk_condominios_chave_normalizada` (UNIQUE)             | Deduplicação determinística no autocomplete e no insert idempotente.               |
+| `avaliacoes`  | `ix_avaliacoes_usuario_dia` (`usuario_id`, `criado_em`) | Cota diária do usuário autenticado em O(log n).                                    |
+| `avaliacoes`  | `ix_avaliacoes_guest_dia` (`guest_id`, `criado_em`)     | Cota diária do guest, simétrica à anterior.                                        |
+| `avaliacoes`  | `ix_avaliacoes_favoritas` (`usuario_id`, `is_favorita`) | Listagem rápida de favoritos sem varrer histórico inteiro.                         |
+| `avaliacoes`  | `idx_avaliacoes_criado_em`                              | Ordenação cronológica do histórico e estatísticas globais.                         |
+| `modelos_ml`  | `uk_modelos_nome_versao` (UNIQUE)                       | Impede registro duplicado da mesma versão de modelo.                               |
+
+### Observações de manutenção
+
+- O schema é parcialmente bootstrapado em runtime: as funções `_ensure_email_verification_columns` e `_ensure_quota_favoritos_columns` em `api.py` aplicam, de forma idempotente, as colunas e índices definidos em [migrations/](migrations/). Alterações manuais nas tabelas envolvidas devem preservar essa idempotência.
+- Tipos `DATETIME` neste schema são _naive_ (sem timezone). O backend grava timestamps em UTC via `datetime.utcnow()`; a migração para colunas timezone-aware é um item de roadmap (ver [README_TESTES.md](README_TESTES.md#warnings-conhecidos-do-pytest)).
+- A política de `ON DELETE RESTRICT` significa que a exclusão de conta (`DELETE /auth/me`) **não remove** registros físicos: o fluxo realiza anonimização lógica em `usuarios` e revogação em `sessoes`, preservando integridade referencial com `avaliacoes`.
+
+---
+
+## Versionamento de API
+
+A partir de **v2.1.0** o caminho canônico de todos os endpoints públicos é `/v1/...`. A janela de coexistência mantém os caminhos legados (sem prefixo) funcionando como **alias** durante pelo menos **1 trimestre**, para evitar quebra de clientes existentes (incluindo o frontend deste repositório, que ainda chama os caminhos legados).
+
+### Comportamento atual
+
+- Toda requisição em `/v1/<rota>` é reescrita pelo middleware `_api_version_middleware` para `<rota>` antes do roteamento. Resultado e contrato são idênticos aos da rota legada.
+- Toda resposta inclui o header `X-API-Version: v1`.
+- Respostas que vieram via prefixo `/v1` recebem também `X-API-Path-Rewritten: v1` (uso interno/depuração).
+- `/docs` (Swagger) reflete a versão corrente da API (`2.1.0`).
+
+### Política de evolução
+
+- Mudanças **não quebrantes** (campos novos opcionais, novos endpoints) entram em `/v1` sem incrementar a versão major.
+- Mudanças **incompatíveis** (remoção ou renomeação de campo, mudança semântica de status code, contrato Pydantic incompatível) **só** podem entrar em uma nova versão (`/v2`), nunca em `/v1`.
+- Endpoints marcados como deprecated devem retornar header `Deprecation: true` e, quando houver data definida, `Sunset: <RFC 7231 date>`.
+- **Janela mínima** entre o anúncio de deprecation e o desligamento: **90 dias / 1 trimestre**.
+- A próxima quebra contratual (quando ocorrer) deve ser planejada em conjunto com o roadmap de B2B/API paga descrito em [docs/NEGOCIAL.md](docs/NEGOCIAL.md).
+
+### Pré-requisitos para abertura de API pública/paga
+
+Alinhado a `docs/NEGOCIAL.md` H4:
+
+- Versionamento `/v1` (já atendido).
+- Autenticação por **API key** dedicada (separada do JWT humano) — **não implementado**.
+- Rate limit por chave — **não implementado**.
+- Contrato OpenAPI versionado e publicado externamente — parcial (`/docs` está disponível; falta exportação versão-pinned).
+- SLA mínimo definido — **não definido**.
+
+---
+
+## Decisões técnicas
+
+| Tema                  | Decisão                                                          | Trade-off                                                                                                                                                                                                                                               |
+| --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend               | FastAPI + Pydantic v2                                            | Documentação automática, validação tipada; custo de adoção mínimo.                                                                                                                                                                                      |
+| ORM                   | SQLAlchemy 1.4 com SQL textual                                   | Controle fino sobre queries críticas; sem mapeamento ORM completo (menos abstração, mais SQL explícito).                                                                                                                                                |
+| Auth                  | JWT HS256 (access 15min) + refresh hash em DB                    | Refresh revogável; segredo único compartilhado (não suporta rotação multi-instância sem ajuste).                                                                                                                                                        |
+| Senhas                | bcrypt via `passlib` (`bcrypt==4.0.1` pinado)                    | `passlib 1.7.4` quebra com bcrypt ≥ 4.1; ver comentário em `requirements.txt`.                                                                                                                                                                          |
+| Verificação de e-mail | Token aleatório, **hash** persistido                             | Mesmo se o DB vazar, tokens não são reusáveis.                                                                                                                                                                                                          |
+| Cotas                 | Contagem em `avaliacoes` por dia                                 | Simples e auditável; depende de DB online (sem fallback in-memory).                                                                                                                                                                                     |
+| Guest tracking        | Cookie httpOnly `prevismob_guest_id` + fallback hash IP+UA       | Sem PII direto; fallback é "best effort" para clientes sem cookie.                                                                                                                                                                                      |
+| Migrações             | SQL idempotente em `migrations/` + bootstrap runtime em `api.py` | Não exige Alembic; risco de divergência se alguém rodar SQL manual incompatível.                                                                                                                                                                        |
+| ML                    | scikit-learn carregado via `joblib.load` no boot                 | Restart necessário ao trocar o `.pkl`; sem versionamento via API.                                                                                                                                                                                       |
+| Algoritmo do modelo   | `RandomForestRegressor` (scikit-learn)                           | Treinado por `treinar_ia.py`; persistido como `MODEL_NAME="RandomForest"`/`MODEL_VERSION="v1.0.0"` em `modelos_ml`. Trocar de algoritmo exige atualizar `treinar_ia.py`, `MODEL_NAME`/`MODEL_VERSION` em `api.py` e `requirements.txt` simultaneamente. |
+| PDF                   | Gerador embutido (PDF 1.4 _single-stream_, sem reportlab/fpdf)   | Stack enxuta sem dependência adicional; limitações: somente texto, encoding WinAnsi/PDFDocEncoding (acentos sanitizados via `_pdf_sanitize`). Ver `_pdf_sanitize` em `api.py`.                                                                          |
+| Geo                   | Chamadas Google Maps por requisição                              | Custo por chamada; sem cache (item de roadmap).                                                                                                                                                                                                         |
+| Frontend              | HTML/CSS/JS puro, single page                                    | Zero build step; difícil de escalar para múltiplas telas.                                                                                                                                                                                               |
+
+---
+
+## Segurança
+
+### Itens já cobertos
+
+- Senhas com bcrypt (custo padrão `passlib`).
+- Verificação obrigatória de e-mail antes do primeiro login (`403` se não verificado).
+- Refresh tokens **hasheados** (SHA-256) no banco; rotação a cada `/auth/refresh`.
+- Tokens de verificação **hasheados** no banco; índice `UNIQUE` sobre o hash.
+- Cookies de guest: `httpOnly`, `SameSite=Lax`.
+- CORS configurável via `CORS_ORIGINS`; lista padrão restrita a localhost dev.
+- `get_optional_user` engole tokens inválidos sem 401 — preserva UX da landing.
+- Logs sanitizam chave Google Maps (`_mask_api_key`).
+- **Headers de segurança globais** aplicados a todas as respostas via `_security_headers_middleware`: `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` e `Content-Security-Policy` mínima coerente com o frontend atual (incluindo `frame-ancestors 'none'`). Ver constante `_DEFAULT_CSP` em `api.py`.
+- **Exclusão de conta self-service** (`DELETE /auth/me`): anonimiza dados pessoais, revoga sessões e severa o vínculo com `avaliacoes` (LGPD).
+
+### Pendências (produção)
+
+- [ ] `JWT_SECRET_KEY` obrigatório (hoje há fallback de dev com warning).
+- [ ] CORS endurecido por domínio.
+- [ ] Cookie `secure=true` por trás de reverse proxy HTTPS (hoje `secure=False` em dev).
+- [ ] Rate limiting por IP em `/auth/*` e `/prever`.
+- [ ] Logger estruturado (substituir `print`) e correlação de request.
+- [ ] CSP endurecida sem `'unsafe-inline'` (exige remover scripts/estilos inline do `index.html` ou usar nonces/hashes).
+- [ ] Auditoria de acesso a histórico/export.
+- [ ] Rotação periódica de `JWT_SECRET_KEY` (exige suporte a `kid`).
+
+---
+
+## Observabilidade
+
+- Logs via `print` no stdout do `uvicorn` — adequado para dev, **não** para produção.
+- Tags úteis no log: `[GoogleMaps]`, `[DB DEBUG]`, `[migration]`.
+- Erros do Google Maps são repassados como `502` com mensagem normalizada (`BILLING_DISABLED`, `INVALID_KEY`, etc.).
+- `tempo_processamento_ms` é gravado em `avaliacoes` quando disponível.
+
+---
+
+## Pontos de atenção para manutenção
+
+1. **Bootstrap runtime de schema:** `_ensure_email_verification_columns` e `_ensure_quota_favoritos_columns` rodam no import de `api.py`. Se você alterar essas tabelas manualmente, garanta que as funções continuem idempotentes.
+2. **Modelo ML:** trocar `modelo_imoveis.pkl` exige reiniciar o backend. As 7 features esperadas estão fixas no código (Quartos, Vagas, Condominio_m2, Distancia_Metro_km, Mercados_500m, Escolas_1000m, Parques_800m).
+3. **Nome do modelo no banco:** `MODEL_NAME = "RandomForest"` em `api.py` reflete o algoritmo realmente treinado em `treinar_ia.py` (`RandomForestRegressor`). Se migrar para outro estimador (ex.: XGBoost), atualizar simultaneamente `MODEL_NAME`, `MODEL_VERSION`, o script de treino e `requirements.txt`.
+4. **Cookies de guest** podem ser apagados pelo usuário a qualquer momento, zerando a cota guest — isso é esperado e não é bug.
+5. **Histórico inline** depende de o frontend estar na `#app-section`. Não tente reaproveitar o componente na landing sem revisar o trecho que oculta dados em `mostrarLanding()`.
+6. **Tokens de verificação** têm TTL de 24h por padrão. Reenvio respeita cooldown (`EMAIL_VERIFY_RESEND_COOLDOWN_MIN`) para evitar abuso.
+7. **CSV legado em `/condominio`:** ainda lê `data/dataset_aguas_claras_completo.csv`. Se o dataset mudar, valide que as colunas usadas pelo endpoint continuam presentes.

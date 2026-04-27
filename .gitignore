@@ -10,3 +10,13 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .env
+
+# Virtualenv local (você usa .venv, não venv)
+.venv/
+
+# Cache do pytest
+.pytest_cache/
+
+# IDE
+.vscode/
+
