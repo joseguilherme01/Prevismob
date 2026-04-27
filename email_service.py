@@ -66,13 +66,29 @@ def _env(name: str, default: str = "") -> str:
     return (os.getenv(name) or default).strip()
 
 
-def _is_dev_mode() -> bool:
-    """Dev mode: sem SMTP configurado ou SMTP_DEV_MODE=1."""
+def _resolve_email_mode() -> str:
+    """Resolve o modo de envio: 'dev' (apenas log) ou 'prod' (SMTP real).
+
+    Prioridade (em ordem):
+    1. ``SMTP_DEV_MODE=1``: override explícito de "não tocar SMTP real".
+       Tem precedência sobre ``EMAIL_MODE`` para servir como kill switch
+       em smoke tests, CI e ambientes onde credenciais não devem ser usadas.
+    2. ``EMAIL_MODE`` (recomendado): ``dev`` | ``prod``.
+    3. Compat retroativa: ausência de ``SMTP_HOST`` força ``dev``.
+    """
     if _env("SMTP_DEV_MODE", "0") == "1":
-        return True
+        return "dev"
+    mode = _env("EMAIL_MODE").lower()
+    if mode in {"dev", "prod"}:
+        return mode
     if not _env("SMTP_HOST"):
-        return True
-    return False
+        return "dev"
+    return "prod"
+
+
+def _is_dev_mode() -> bool:
+    """Compat: True quando o modo resolvido é 'dev'."""
+    return _resolve_email_mode() == "dev"
 
 
 def _is_dev_env() -> bool:
@@ -134,15 +150,35 @@ def _log_verification_event(event: str, to_email: str, token: str, link: str, **
 
 
 def build_verification_link(token: str) -> str:
-    base = _env("APP_BASE_URL", "http://localhost:8000").rstrip("/")
-    # Rota pública que confirma o e-mail via GET.
-    return f"{base}/auth/verificar-email?token={token}"
+    """Monta o link de verificação.
+
+    ``APP_BASE_URL`` deve apontar para a página do frontend que interpreta o
+    deep link ``?token=...`` (ex.: ``http://127.0.0.1:5500/index.html``).
+    Respeita querystring pré-existente na base. Espaços acidentais em
+    ``APP_BASE_URL`` são removidos; vazio após ``strip`` usa fallback local.
+    """
+    _FALLBACK = "http://127.0.0.1:5500/index.html"
+    base = (_env("APP_BASE_URL") or "").strip()
+    if not base:
+        base = _FALLBACK
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}token={token}"
+
+
+def _resolve_from_address() -> str:
+    """Remetente: prioriza FROM_EMAIL, depois SMTP_FROM, depois SMTP_USER."""
+    return (
+        _env("FROM_EMAIL")
+        or _env("SMTP_FROM")
+        or _env("SMTP_USER")
+        or "no-reply@prevismob.local"
+    )
 
 
 def _compose_message(to_email: str, verification_link: str) -> EmailMessage:
     msg = EmailMessage()
-    msg["Subject"] = "Confirme seu e-mail — PrevIsmob"
-    msg["From"] = _env("SMTP_FROM", "no-reply@prevismob.local")
+    msg["Subject"] = "Verifique seu e-mail - PrevIsmob"
+    msg["From"] = _resolve_from_address()
     msg["To"] = to_email
     msg.set_content(
         "Olá!\n\n"
@@ -152,14 +188,24 @@ def _compose_message(to_email: str, verification_link: str) -> EmailMessage:
     )
     msg.add_alternative(
         f"""<!doctype html>
-<html><body style="font-family:Arial,sans-serif;">
-<p>Olá!</p>
-<p>Para concluir seu cadastro no <strong>PrevIsmob</strong>, clique no botão abaixo:</p>
-<p><a href="{verification_link}"
-   style="display:inline-block;padding:10px 18px;background:#1f6feb;color:#fff;
-   text-decoration:none;border-radius:6px;">Confirmar e-mail</a></p>
-<p>Ou copie este link no navegador:<br><code>{verification_link}</code></p>
-<p>Se você não solicitou este cadastro, ignore esta mensagem.</p>
+<html><body style="font-family:Arial,sans-serif;background:#f6f8fa;padding:24px;">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;
+              padding:28px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+    <h2 style="margin:0 0 12px;color:#1f2328;">Verifique seu e-mail</h2>
+    <p style="color:#1f2328;">Olá! Para concluir seu cadastro no <strong>PrevIsmob</strong>,
+      clique no botão abaixo:</p>
+    <p style="text-align:center;margin:24px 0;">
+      <a href="{verification_link}"
+         style="display:inline-block;padding:12px 22px;background:#1f6feb;color:#fff;
+                text-decoration:none;border-radius:6px;font-weight:600;">
+        Verificar e-mail
+      </a>
+    </p>
+    <p style="color:#57606a;font-size:13px;">Se o botão não funcionar, copie e cole o link abaixo no seu navegador:</p>
+    <p style="word-break:break-all;font-size:12px;"><code>{verification_link}</code></p>
+    <hr style="border:none;border-top:1px solid #eaeef2;margin:20px 0;">
+    <p style="color:#8b949e;font-size:12px;">Se você não solicitou este cadastro, ignore esta mensagem.</p>
+  </div>
 </body></html>""",
         subtype="html",
     )
@@ -168,35 +214,64 @@ def _compose_message(to_email: str, verification_link: str) -> EmailMessage:
 
 def send_verification_email(to_email: str, token: str) -> bool:
     """
-    Envia e-mail de verificação. Retorna True em sucesso (ou dev-mode).
-    - Em dev (APP_ENV=development): log inclui link para facilitar testes locais.
-    - Em staging/production: logs contêm apenas metadados seguros (nunca token
-      ou link completo).
+    Envia e-mail de verificação. Retorna True em sucesso (ou em modo dev).
+
+    Modos (``EMAIL_MODE``):
+    - ``dev``: apenas loga o link no terminal (comportamento de desenvolvimento).
+    - ``prod``: envia via SMTP real (Gmail, etc.).
+
+    Em caso de falha SMTP em ``prod``, retorna ``False`` e registra a causa
+    técnica no log, sem expor credenciais ou token completo em ambientes
+    não-dev.
     """
     link = build_verification_link(token)
+    mode = _resolve_email_mode()
 
-    if _is_dev_mode():
-        _log_verification_event("verification email [DEV]", to_email, token, link, entrega="simulada")
+    if mode == "dev":
+        # Modo simulado: nenhum SMTP é tocado. Em APP_ENV=development o link
+        # completo e o label [DEV] são úteis para depuração local. Em
+        # staging/production (ainda que com SMTP_DEV_MODE=1, ex.: smoke test
+        # sem credenciais), o log precisa ser neutro: e-mail mascarado, sem
+        # token nem link, e marcado como entrega=simulada para auditoria.
+        if _is_dev_env():
+            logger.info(
+                "[DEV] verification email sent to=%s link=%s entrega=simulada",
+                to_email, link,
+            )
+        else:
+            _log_verification_event(
+                "verification email sent", to_email, token, link,
+                status="ok", entrega="simulada",
+            )
         return True
 
+    # -------- PROD --------
     host = _env("SMTP_HOST")
     port = int(_env("SMTP_PORT", "587") or "587")
     user = _env("SMTP_USER")
     password = os.getenv("SMTP_PASS") or ""
-    use_ssl = _env("SMTP_USE_SSL", "0") == "1"
+    use_ssl = _env("SMTP_USE_SSL", "0") == "1" or port == 465
     use_tls = _env("SMTP_USE_TLS", "1") == "1"
+    timeout = int(_env("SMTP_TIMEOUT", "15") or "15")
+
+    if not host:
+        logger.error(
+            "[EMAIL_MODE=prod] SMTP_HOST ausente — impossível enviar e-mail para %s",
+            _mask_email(to_email),
+        )
+        return False
 
     msg = _compose_message(to_email, link)
 
     try:
         if use_ssl:
             context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, port, context=context, timeout=15) as server:
+            with smtplib.SMTP_SSL(host, port, context=context, timeout=timeout) as server:
                 if user:
                     server.login(user, password)
                 server.send_message(msg)
         else:
-            with smtplib.SMTP(host, port, timeout=15) as server:
+            with smtplib.SMTP(host, port, timeout=timeout) as server:
                 server.ehlo()
                 if use_tls:
                     server.starttls(context=ssl.create_default_context())
@@ -204,13 +279,33 @@ def send_verification_email(to_email: str, token: str) -> bool:
                 if user:
                     server.login(user, password)
                 server.send_message(msg)
-        _log_verification_event("verification email sent", to_email, token, link, status="ok", entrega="real")
+
+        _log_verification_event(
+            "verification email sent", to_email, token, link,
+            status="ok", entrega="real", host=host, port=port,
+        )
         return True
-    except Exception as exc:  # noqa: BLE001
-        # Falha de SMTP: não derrubamos o fluxo do cadastro; log sem token/link.
+    except smtplib.SMTPAuthenticationError as exc:
+        # exc_info=True imprime stack trace sem expor SMTP_PASS nem token
+        # (a exceção do smtplib contém apenas código/mensagem do servidor).
+        logger.error(
+            "[EMAIL_MODE=prod] falha de autenticação SMTP to=%s host=%s err=%s",
+            _mask_email(to_email), host,
+            exc.smtp_code if hasattr(exc, "smtp_code") else "?",
+            exc_info=True,
+        )
+        return False
+    except (smtplib.SMTPException, OSError) as exc:
+        # OSError cobre timeouts/conexão recusada; não vazamos segredo/token.
         if _is_dev_env():
-            logger.error("falha SMTP ao enviar verificação para %s: %s", to_email, exc)
+            logger.error(
+                "[EMAIL_MODE=prod] falha SMTP to=%s host=%s err=%s",
+                to_email, host, exc, exc_info=True,
+            )
         else:
-            logger.error("falha SMTP ao enviar verificação to=%s err_type=%s",
-                         _mask_email(to_email), type(exc).__name__)
+            logger.error(
+                "[EMAIL_MODE=prod] falha SMTP to=%s host=%s err_type=%s",
+                _mask_email(to_email), host, type(exc).__name__,
+                exc_info=True,
+            )
         return False

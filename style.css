@@ -243,7 +243,11 @@ button {
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at 15% 15%, rgba(45, 125, 210, 0.14), transparent 45%),
+    radial-gradient(
+      circle at 15% 15%,
+      rgba(45, 125, 210, 0.14),
+      transparent 45%
+    ),
     radial-gradient(circle at 85% 10%, rgba(10, 22, 40, 0.1), transparent 42%),
     linear-gradient(180deg, #f8fafc 0%, #edf3f9 100%);
   padding: var(--sp-6);
@@ -279,6 +283,172 @@ button {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-3);
+}
+
+/* -------- Auth tabs / panes / helpers -------- */
+.auth-tabs {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+  border-bottom: 1px solid var(--c-gray-200);
+}
+.auth-tab {
+  flex: 1;
+  padding: var(--sp-3) var(--sp-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--c-gray-600);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+.auth-tab:hover {
+  color: var(--c-navy);
+}
+.auth-tab.is-active {
+  color: var(--c-blue);
+  border-bottom-color: var(--c-blue);
+}
+.auth-pane {
+  display: none;
+}
+.auth-pane.is-active {
+  display: block;
+}
+.auth-info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius);
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #14532d;
+  font-size: var(--text-sm);
+  margin-bottom: var(--sp-4);
+}
+.auth-info__icon {
+  font-weight: 700;
+  color: var(--c-success);
+}
+.auth-resend {
+  margin: var(--sp-3) 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-gray-50);
+  border: 1px dashed var(--c-gray-200);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  color: var(--c-gray-600);
+}
+.auth-resend p {
+  margin-bottom: var(--sp-2);
+}
+.btn-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--c-blue);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  text-decoration: underline;
+}
+.btn-link:hover {
+  color: var(--c-navy);
+}
+.btn-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* callback de verificação */
+.verify-status {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sp-6) 0;
+}
+.verify-status[data-state="success"]::before {
+  content: "✓";
+  font-size: 2.5rem;
+  color: var(--c-success);
+  font-weight: 700;
+}
+.verify-status[data-state="error"]::before {
+  content: "⚠";
+  font-size: 2.5rem;
+  color: var(--c-danger);
+}
+.verify-spinner {
+  display: inline-block;
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--c-gray-200);
+  border-top-color: var(--c-blue);
+  border-radius: 50%;
+  animation: verifySpin 0.9s linear infinite;
+}
+.verify-status[data-state="success"] .verify-spinner,
+.verify-status[data-state="error"] .verify-spinner {
+  display: none;
+}
+@keyframes verifySpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* hint/texto auxiliar em formulário */
+.form-hint {
+  display: block;
+  margin-top: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--c-gray-600);
+  line-height: 1.4;
+}
+
+/* user info no header do dashboard */
+.dash-user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-gray-50);
+  border: 1px solid var(--c-gray-200);
+  border-radius: var(--radius);
+  max-width: 260px;
+}
+.dash-user__avatar {
+  font-size: 1.1rem;
+}
+.dash-user__info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  overflow: hidden;
+}
+.dash-user__info strong {
+  font-size: var(--text-sm);
+  color: var(--c-navy);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 200px;
+}
+.dash-user__info small {
+  font-size: var(--text-xs);
+  color: var(--c-gray-600);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 200px;
+}
+@media (max-width: 640px) {
+  .dash-user {
+    display: none !important;
+  }
 }
 
 /* ----------------------------------------------------------------
@@ -563,25 +733,6 @@ button {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.45);
   color: var(--c-white);
-}
-
-.hero__stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-8);
-}
-.hero__stat strong {
-  display: block;
-  font-size: var(--text-2xl);
-  font-weight: 800;
-  color: var(--c-white);
-  line-height: 1;
-}
-.hero__stat span {
-  font-size: var(--text-xs);
-  color: rgba(255, 255, 255, 0.55);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 /* Hero float card  */
@@ -1524,4 +1675,341 @@ button {
   .dash-main {
     padding: var(--sp-8);
   }
+}
+
+/* ============================================================
+   FASE: cota guest/auth, nav auth, histórico, comparação
+   ============================================================ */
+
+/*
+ * Garante que o atributo HTML [hidden] sempre vença regras de display
+ * declaradas em classes (.nav__user, .nav__auth-btn, etc). Sem isso, um
+ * `display: inline-flex` no .nav__user faz com que ele apareça mesmo
+ * marcado como hidden no estado guest — bug clássico de cascata.
+ */
+[hidden] {
+  display: none !important;
+}
+
+.nav__auth {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3, 12px);
+  margin-left: var(--sp-4, 16px);
+}
+/*
+ * .nav__auth-btn é apenas um GANCHO DE LAYOUT (gap, alinhamento).
+ * NÃO redefine cores/borda — para não conflitar com .btn--primary,
+ * .btn--outline e .btn--ghost. Bug anterior: fixava color:#fff numa nav
+ * de fundo claro, deixando "Entrar/Criar conta/Sair" invisíveis.
+ */
+.nav__auth-btn {
+  /* Inherits styling from .btn / .btn--primary|--outline|--ghost */
+}
+
+/* Estados acessíveis (focus-visible/disabled) específicos do header
+   topo — reforçam contraste sem sobrescrever a paleta dos tokens .btn--*. */
+.nav__auth .btn:focus-visible,
+.nav__cta:focus-visible {
+  outline: 3px solid var(--c-blue-light, #5b9ee6);
+  outline-offset: 2px;
+}
+.nav__auth .btn[disabled],
+.nav__cta[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.nav__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 6px;
+  border-radius: 999px;
+  /* Fundo azul-pale da identidade visual + texto navy = contraste AA */
+  background: var(--c-blue-pale, #e8f2fc);
+  color: var(--c-navy, #0a1628);
+  border: 1px solid var(--c-blue-light, #5b9ee6);
+  font-size: var(--text-sm, 14px);
+  font-weight: 600;
+}
+.nav__user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--c-blue, #2d7dd2);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+/* Quota badge no dashboard */
+.quota-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #1e3a8a;
+  font-size: 13px;
+  font-weight: 500;
+  margin-left: 8px;
+}
+.quota-badge--full {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Banner de limite atingido */
+.quota-banner {
+  margin: 16px 0;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-left: 4px solid #f59e0b;
+  color: #78350f;
+}
+.quota-banner__title {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+}
+.quota-banner__text {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+.quota-banner__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.quota-banner__cta {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.quota-banner__cta--primary {
+  background: var(--cor-primaria, #2563eb);
+  color: #fff;
+}
+.quota-banner__cta--ghost {
+  background: transparent;
+  color: #78350f;
+  border: 1px solid #b45309;
+}
+
+/* Painel de histórico */
+.historico-panel {
+  margin-top: 24px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.historico-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.historico-panel__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.historico-panel__actions button {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  cursor: pointer;
+}
+.historico-panel__actions button:hover {
+  background: #f3f4f6;
+}
+
+.historico-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.historico-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.historico-item--vazio {
+  justify-content: center;
+  color: #6b7280;
+}
+.historico-fav {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: #f59e0b;
+  cursor: pointer;
+  line-height: 1;
+}
+.historico-fav[aria-pressed="true"] {
+  color: #d97706;
+}
+.historico-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.historico-meta {
+  font-size: 12px;
+  color: #6b7280;
+}
+.historico-valor {
+  font-weight: 600;
+  color: #065f46;
+}
+
+/* Tabela de comparação */
+.comparacao-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 14px;
+}
+.comparacao-table th,
+.comparacao-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+.comparacao-table th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+.comparacao-table tr:hover td {
+  background: #f9fafb;
+}
+
+@media (max-width: 640px) {
+  .nav__auth {
+    gap: 6px;
+    margin-left: 8px;
+  }
+  .nav__auth-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .historico-item {
+    flex-wrap: wrap;
+  }
+}
+
+/* ============================================================
+   FASE: refinamento UX (contraste/azul/inline-history)
+   ============================================================ */
+
+/* Chips e botões do topo do dashboard — paleta azul consistente */
+.dash-header__actions .btn--ghost,
+.dash-header__actions .btn--outline {
+  /* Reforço de contraste em fundo branco do header */
+  color: var(--c-navy);
+  border-color: var(--c-gray-300, #cbd5e1);
+}
+.dash-header__actions .btn--ghost:hover,
+.dash-header__actions .btn--outline:hover {
+  color: var(--c-blue);
+  background: var(--c-blue-pale);
+  border-color: var(--c-blue-light);
+}
+.dash-header__actions .btn:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: 2px;
+}
+.dash-header__actions .btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Tag "Análise de Imóvel" — contraste AA (texto navy sobre azul-pale) */
+.dash-header__tag {
+  color: var(--c-navy) !important;
+  background: var(--c-blue-pale);
+  border: 1px solid var(--c-blue-light);
+  letter-spacing: 0.02em;
+}
+
+/* Quota badge — paleta unificada com a identidade azul */
+.quota-badge {
+  background: var(--c-blue-pale);
+  color: var(--c-navy);
+  border: 1px solid var(--c-blue-light);
+  font-weight: 600;
+}
+.quota-badge--full {
+  background: #fde2e2;
+  color: #7a1d1d;
+  border-color: #f5a3a3;
+}
+
+/* Histórico inline (auto-expandido para auth) */
+.historico-panel--inline {
+  margin-top: var(--sp-6, 24px);
+  scroll-margin-top: 80px; /* respeita header sticky no scrollIntoView */
+}
+.historico-panel--inline .historico-panel__header h2 {
+  font-size: var(--text-lg, 18px);
+  color: var(--c-navy);
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.historico-panel--inline.historico-panel--colapsado .historico-panel__body,
+.historico-panel--inline.historico-panel--colapsado .historico-panel__actions {
+  /* preserva header e botão de expandir */
+}
+.historico-panel--inline.historico-panel--colapsado .historico-panel__body {
+  display: none;
+}
+
+/* Estado vazio para guest */
+.historico-empty-state {
+  padding: 20px 24px;
+  background: linear-gradient(135deg, var(--c-blue-pale), #f0f7ff);
+  border: 1px dashed var(--c-blue-light);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.historico-empty-state p {
+  margin: 0;
+  color: var(--c-navy);
+  font-size: 14px;
+  flex: 1 1 260px;
+}
+
+/* Foco acessível global em controles do dash */
+.dash-main button:focus-visible,
+.dash-main input:focus-visible,
+.dash-main select:focus-visible,
+.dash-main label:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: 2px;
 }

@@ -43,6 +43,8 @@ def fake_db(monkeypatch) -> FakeDB:
 
     # --- bypass da migração runtime (já teria rodado no import) ---
     monkeypatch.setattr(api_module, "_ensure_email_verification_columns", lambda: None)
+    if hasattr(api_module, "_ensure_quota_favoritos_columns"):
+        monkeypatch.setattr(api_module, "_ensure_quota_favoritos_columns", lambda: None)
 
     # ---- usuários ----
     def _email_already_registered(email: str) -> bool:
@@ -106,6 +108,22 @@ def fake_db(monkeypatch) -> FakeDB:
         if u:
             u.ultimo_login_em = datetime.utcnow()
 
+    def _delete_user_account(user_id):
+        u = db.get_by_id(int(user_id))
+        if not u:
+            return False
+        u.email = f"deleted+{int(user_id)}@anonymized.local"
+        u.nome = "Usuário removido"
+        u.senha_hash = "anonymized"
+        u.ativo = 0
+        u.email_verificado_em = None
+        u.email_verificacao_token_hash = None
+        u.email_verificacao_expira_em = None
+        u.email_verificacao_enviado_em = None
+        # revoga sessões do usuário
+        db.sessions = [s for s in db.sessions if int(s.get("user_id", 0)) != int(user_id)]
+        return True
+
     monkeypatch.setattr(api_module, "_email_already_registered", _email_already_registered)
     monkeypatch.setattr(api_module, "_insert_usuario", _insert_usuario)
     monkeypatch.setattr(api_module, "_get_user_by_email", _get_user_by_email)
@@ -116,6 +134,8 @@ def fake_db(monkeypatch) -> FakeDB:
     monkeypatch.setattr(api_module, "_marcar_email_verificado", _marcar_email_verificado)
     monkeypatch.setattr(api_module, "_create_refresh_session", _create_refresh_session)
     monkeypatch.setattr(api_module, "_update_user_last_login", _update_user_last_login)
+    if hasattr(api_module, "_delete_user_account"):
+        monkeypatch.setattr(api_module, "_delete_user_account", _delete_user_account)
 
     # ---- spy de envio de e-mail: captura token puro para testes ----
     def _spy_send(to_email: str, token: str) -> bool:

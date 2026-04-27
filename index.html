@@ -33,6 +33,48 @@
             <li><a href="#vantagens">Vantagens</a></li>
             <li><a href="#quem-usa">Quem usa</a></li>
           </ul>
+          <div class="nav__auth" id="nav-auth">
+            <!-- Estado: deslogado -->
+            <button
+              class="btn btn--outline btn--sm nav__auth-btn"
+              id="nav-btn-login"
+              type="button"
+              data-auth-state="guest"
+            >
+              Entrar
+            </button>
+            <button
+              class="btn btn--primary btn--sm nav__auth-btn"
+              id="nav-btn-register"
+              type="button"
+              data-auth-state="guest"
+            >
+              Criar conta
+            </button>
+            <!-- Estado: logado -->
+            <span class="nav__user" id="nav-user" data-auth-state="auth" hidden>
+              <span class="nav__user-avatar" aria-hidden="true">👤</span>
+              <span class="nav__user-name" id="nav-user-name">—</span>
+            </span>
+            <button
+              class="btn btn--outline btn--sm nav__auth-btn"
+              id="nav-btn-historico"
+              type="button"
+              data-auth-state="auth"
+              hidden
+            >
+              Histórico
+            </button>
+            <button
+              class="btn btn--primary btn--sm nav__auth-btn"
+              id="nav-btn-logout"
+              type="button"
+              data-auth-state="auth"
+              hidden
+            >
+              Sair
+            </button>
+          </div>
           <button class="btn btn--primary nav__cta" id="btn-comecar">
             Avaliar Imóvel
           </button>
@@ -67,17 +109,6 @@
               <a href="#como-funciona" class="btn btn--ghost btn--lg"
                 >Como funciona ↓</a
               >
-            </div>
-            <div class="hero__stats">
-              <div class="hero__stat">
-                <strong>+3.200</strong><span>Imóveis analisados</span>
-              </div>
-              <div class="hero__stat">
-                <strong>94%</strong><span>Precisão do modelo</span>
-              </div>
-              <div class="hero__stat">
-                <strong>&lt; 3s</strong><span>Tempo de resposta</span>
-              </div>
             </div>
           </div>
 
@@ -238,10 +269,10 @@
                 <li class="benefit-item" data-animate>
                   <div class="benefit-icon" aria-hidden="true">✦</div>
                   <div>
-                    <strong>Rápido, gratuito e sem cadastro</strong>
+                    <strong>Cadastro rápido e seguro</strong>
                     <p>
-                      Resultado em menos de 3 segundos, sem criação de conta,
-                      sem custo e sem anúncios.
+                      Crie sua conta gratuita em menos de 1 minuto com
+                      verificação por e-mail — sem custo e sem anúncios.
                     </p>
                   </div>
                 </li>
@@ -347,18 +378,39 @@
     <!-- /landing-section -->
 
     <!-- ============================================================
-       AUTH — LOGIN
+       AUTH — LOGIN / CADASTRO / VERIFICAÇÃO
        ============================================================ -->
     <div id="auth-section" style="display: none">
       <main class="dash-main auth-main">
         <div class="auth-card">
-          <div class="auth-card__header">
-            <h2>Entrar na plataforma</h2>
-            <p>
-              Faça login para acessar a previsão e testar regras de negócio.
-            </p>
+          <!-- Abas -->
+          <div
+            class="auth-tabs"
+            role="tablist"
+            aria-label="Autenticação"
+            id="auth-tabs"
+          >
+            <button
+              type="button"
+              class="auth-tab is-active"
+              data-auth-tab="login"
+              role="tab"
+              aria-selected="true"
+            >
+              Entrar
+            </button>
+            <button
+              type="button"
+              class="auth-tab"
+              data-auth-tab="register"
+              role="tab"
+              aria-selected="false"
+            >
+              Criar conta
+            </button>
           </div>
 
+          <!-- Banner de erro genérico -->
           <div class="erro-banner" id="authMensagem" style="display: none">
             <div class="erro-banner__inner">
               <span class="erro-banner__icon" aria-hidden="true">⚠</span>
@@ -366,55 +418,239 @@
             </div>
           </div>
 
-          <form id="formLogin" class="form" novalidate>
-            <div class="form-group">
-              <label class="form-label" for="login_email">E-mail</label>
-              <div class="form-input-wrap">
-                <span class="form-input-icon" aria-hidden="true">@</span>
-                <input
-                  type="email"
-                  id="login_email"
-                  name="login_email"
-                  class="form-input"
-                  placeholder="seuemail@dominio.com"
-                  autocomplete="email"
-                  required
-                />
-              </div>
+          <!-- Banner de sucesso / info -->
+          <div class="auth-info" id="authSucesso" style="display: none">
+            <span class="auth-info__icon" aria-hidden="true">✓</span>
+            <span id="authSucessoTexto"></span>
+          </div>
+
+          <!-- ================= LOGIN ================= -->
+          <section
+            class="auth-pane is-active"
+            id="auth-pane-login"
+            data-auth-pane="login"
+            role="tabpanel"
+          >
+            <div class="auth-card__header">
+              <h2>Entrar na plataforma</h2>
+              <p>Acesse sua conta para gerar avaliações.</p>
             </div>
 
-            <div class="form-group">
-              <label class="form-label" for="login_senha">Senha</label>
-              <div class="form-input-wrap">
-                <span class="form-input-icon" aria-hidden="true">🔒</span>
-                <input
-                  type="password"
-                  id="login_senha"
-                  name="login_senha"
-                  class="form-input"
-                  placeholder="Digite sua senha"
-                  autocomplete="current-password"
-                  required
-                />
+            <form id="formLogin" class="form" novalidate>
+              <div class="form-group">
+                <label class="form-label" for="login_email">E-mail</label>
+                <div class="form-input-wrap">
+                  <span class="form-input-icon" aria-hidden="true">@</span>
+                  <input
+                    type="email"
+                    id="login_email"
+                    name="login_email"
+                    class="form-input"
+                    placeholder="seuemail@dominio.com"
+                    autocomplete="email"
+                    required
+                  />
+                </div>
               </div>
+
+              <div class="form-group">
+                <label class="form-label" for="login_senha">Senha</label>
+                <div class="form-input-wrap">
+                  <span class="form-input-icon" aria-hidden="true">🔒</span>
+                  <input
+                    type="password"
+                    id="login_senha"
+                    name="login_senha"
+                    class="form-input"
+                    placeholder="Digite sua senha"
+                    autocomplete="current-password"
+                    required
+                  />
+                </div>
+              </div>
+
+              <!-- CTA de reenvio (aparece após 403 e-mail não verificado) -->
+              <div
+                class="auth-resend"
+                id="loginResendBox"
+                style="display: none"
+              >
+                <p>Não recebeu o e-mail de verificação?</p>
+                <button type="button" class="btn-link" id="btnReenviarLogin">
+                  Reenviar link de verificação
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                class="btn btn--primary btn--full"
+                id="btnLogin"
+              >
+                Entrar
+              </button>
+
+              <button
+                type="button"
+                class="btn btn--ghost btn--full"
+                id="btnVoltarLanding"
+              >
+                Voltar para a página inicial
+              </button>
+            </form>
+          </section>
+
+          <!-- ================= CADASTRO ================= -->
+          <section
+            class="auth-pane"
+            id="auth-pane-register"
+            data-auth-pane="register"
+            role="tabpanel"
+            hidden
+          >
+            <div class="auth-card__header">
+              <h2>Criar conta</h2>
+              <p>
+                É rápido e gratuito. Você receberá um e-mail para verificar sua
+                conta.
+              </p>
             </div>
 
-            <button
-              type="submit"
-              class="btn btn--primary btn--full"
-              id="btnLogin"
-            >
-              Entrar
-            </button>
+            <form id="formCadastro" class="form" novalidate>
+              <div class="form-group">
+                <label class="form-label" for="reg_nome">Nome</label>
+                <div class="form-input-wrap">
+                  <span class="form-input-icon" aria-hidden="true">👤</span>
+                  <input
+                    type="text"
+                    id="reg_nome"
+                    name="reg_nome"
+                    class="form-input"
+                    placeholder="Seu nome completo"
+                    autocomplete="name"
+                    maxlength="120"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="reg_email">E-mail</label>
+                <div class="form-input-wrap">
+                  <span class="form-input-icon" aria-hidden="true">@</span>
+                  <input
+                    type="email"
+                    id="reg_email"
+                    name="reg_email"
+                    class="form-input"
+                    placeholder="seuemail@dominio.com"
+                    autocomplete="email"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="reg_senha">Senha</label>
+                <div class="form-input-wrap">
+                  <span class="form-input-icon" aria-hidden="true">🔒</span>
+                  <input
+                    type="password"
+                    id="reg_senha"
+                    name="reg_senha"
+                    class="form-input"
+                    placeholder="Mín. 8 caracteres, com letra e número"
+                    autocomplete="new-password"
+                    minlength="8"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="reg_senha2"
+                  >Confirmar senha</label
+                >
+                <div class="form-input-wrap">
+                  <span class="form-input-icon" aria-hidden="true">🔒</span>
+                  <input
+                    type="password"
+                    id="reg_senha2"
+                    name="reg_senha2"
+                    class="form-input"
+                    placeholder="Repita a senha"
+                    autocomplete="new-password"
+                    minlength="8"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                class="btn btn--primary btn--full"
+                id="btnCadastrar"
+              >
+                Criar conta
+              </button>
+
+              <button
+                type="button"
+                class="btn btn--ghost btn--full"
+                id="btnVoltarLandingReg"
+              >
+                Voltar para a página inicial
+              </button>
+            </form>
+          </section>
+
+          <!-- ================= VERIFICAÇÃO (callback) ================= -->
+          <section
+            class="auth-pane"
+            id="auth-pane-verify"
+            data-auth-pane="verify"
+            role="tabpanel"
+            hidden
+          >
+            <div class="auth-card__header">
+              <h2 id="verifyTitulo">Verificando seu e-mail…</h2>
+              <p id="verifyTexto">Aguarde um instante.</p>
+            </div>
+
+            <div class="verify-status" id="verifyStatus" data-state="loading">
+              <span class="verify-spinner" aria-hidden="true"></span>
+            </div>
+
+            <div class="auth-resend" id="verifyResendBox" style="display: none">
+              <div class="form-group">
+                <label class="form-label" for="verify_email">Seu e-mail</label>
+                <div class="form-input-wrap">
+                  <span class="form-input-icon" aria-hidden="true">@</span>
+                  <input
+                    type="email"
+                    id="verify_email"
+                    class="form-input"
+                    placeholder="seuemail@dominio.com"
+                    autocomplete="email"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                class="btn btn--primary btn--full"
+                id="btnReenviarVerify"
+              >
+                Reenviar link de verificação
+              </button>
+            </div>
 
             <button
               type="button"
               class="btn btn--ghost btn--full"
-              id="btnVoltarLanding"
+              id="btnIrLogin"
             >
-              Voltar para a página inicial
+              Ir para o login
             </button>
-          </form>
+          </section>
         </div>
       </main>
     </div>
@@ -435,7 +671,31 @@
             <span>PrevIsmob</span>
           </div>
           <div class="dash-header__actions">
+            <div class="dash-user" id="dashUser" style="display: none" title="">
+              <span class="dash-user__avatar" aria-hidden="true">👤</span>
+              <span class="dash-user__info">
+                <strong id="dashUserNome">—</strong>
+                <small id="dashUserEmail">—</small>
+              </span>
+            </div>
             <span class="dash-header__tag">Análise de Imóvel</span>
+            <span
+              class="quota-badge"
+              id="quotaBadge"
+              title="Previsões diárias"
+              hidden
+            >
+              <span class="quota-badge__icon" aria-hidden="true">⏱</span>
+              <span id="quotaText">—</span>
+            </span>
+            <button
+              class="btn btn--ghost btn--sm"
+              id="btn-historico"
+              type="button"
+              hidden
+            >
+              Histórico
+            </button>
             <button
               class="btn btn--outline btn--sm"
               id="btn-logout"
@@ -472,6 +732,35 @@
       </div>
 
       <main class="dash-main">
+        <!-- BANNER DE LIMITE ATINGIDO -->
+        <div class="quota-banner" id="quotaLimitBanner" role="alert" hidden>
+          <div class="quota-banner__content">
+            <span class="quota-banner__icon" aria-hidden="true">🔒</span>
+            <div>
+              <strong id="quotaLimitTitulo">Limite diário atingido</strong>
+              <p id="quotaLimitTexto">
+                Você usou todas as previsões gratuitas de hoje.
+              </p>
+            </div>
+          </div>
+          <div class="quota-banner__actions">
+            <button
+              type="button"
+              class="btn btn--primary btn--sm"
+              id="quotaCtaLogin"
+            >
+              Entrar
+            </button>
+            <button
+              type="button"
+              class="btn btn--outline btn--sm"
+              id="quotaCtaRegister"
+            >
+              Criar conta grátis
+            </button>
+          </div>
+        </div>
+
         <div class="dash-grid">
           <!-- PAINEL ESQUERDO: FORMULÁRIO -->
           <aside class="dash-form-panel">
@@ -484,7 +773,9 @@
 
             <form id="formularioImovel" class="form" novalidate>
               <div class="form-group">
-                <label class="form-label" for="nome_predio">Condomínio</label>
+                <label class="form-label" for="nome_predio"
+                  >Condomínio ou endereço</label
+                >
                 <div class="form-input-wrap">
                   <span class="form-input-icon" aria-hidden="true">📍</span>
                   <input
@@ -492,11 +783,16 @@
                     id="nome_predio"
                     name="nome_predio"
                     class="form-input"
-                    placeholder="Digite o nome do condomínio..."
+                    placeholder="Ex.: Ed. Supremo ou Rua 25 Norte, 100 — Águas Claras"
                     autocomplete="off"
+                    minlength="5"
                     required
                   />
                 </div>
+                <small class="form-hint">
+                  Informe o nome do condomínio ou endereço completo. O mapa será
+                  gerado automaticamente.
+                </small>
               </div>
 
               <div class="form-row">
@@ -707,6 +1003,92 @@
           <!-- /resultado -->
         </div>
         <!-- /dash-grid -->
+
+        <!-- ============================================================
+             HISTÓRICO INLINE (auto-expandido para usuários autenticados)
+             ============================================================ -->
+        <section
+          class="historico-panel historico-panel--inline"
+          id="historicoInlineSection"
+          aria-labelledby="historicoTitulo"
+          hidden
+        >
+          <div class="historico-panel__header">
+            <h2 id="historicoTitulo">
+              <span aria-hidden="true">📚</span>
+              Meu histórico de avaliações
+            </h2>
+            <div class="historico-panel__actions" data-auth-state="auth" hidden>
+              <label class="historico-panel__filter">
+                <input type="checkbox" id="historicoFavoritosOnly" />
+                Apenas favoritas
+              </label>
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm"
+                id="btnExportCsv"
+              >
+                ⬇ CSV
+              </button>
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm"
+                id="btnExportPdf"
+              >
+                ⬇ PDF
+              </button>
+              <button
+                type="button"
+                class="btn btn--outline btn--sm"
+                id="btnCompararFavoritas"
+              >
+                Comparar favoritas
+              </button>
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm"
+                id="btnRecolherHistorico"
+                aria-pressed="false"
+                title="Recolher histórico"
+              >
+                – Recolher
+              </button>
+            </div>
+          </div>
+
+          <!-- Estado vazio para guest (somente leitura até logar) -->
+          <div
+            class="historico-empty-state"
+            id="historicoGuestCta"
+            data-auth-state="guest"
+            hidden
+          >
+            <p>
+              🔓 Crie uma conta gratuita para guardar até
+              <strong>10 avaliações por dia</strong>, favoritar imóveis e
+              exportar em CSV/PDF.
+            </p>
+            <button
+              type="button"
+              class="btn btn--primary btn--sm"
+              id="historicoGuestCtaBtn"
+            >
+              Criar conta
+            </button>
+          </div>
+
+          <div class="historico-panel__body" data-auth-state="auth" hidden>
+            <div class="historico-list" id="historicoList">
+              <p class="historico-empty" id="historicoEmpty">
+                Carregando seu histórico…
+              </p>
+            </div>
+            <div class="comparacao-wrap" id="comparacaoWrap" hidden>
+              <h3>Comparação de favoritas</h3>
+              <div class="comparacao-table" id="comparacaoTabela"></div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
     <!-- /app-section -->
