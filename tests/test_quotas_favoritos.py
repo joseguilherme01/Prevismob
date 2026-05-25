@@ -29,12 +29,12 @@ LOGIN_PAYLOAD = {"email": REGISTER_PAYLOAD["email"], "senha": REGISTER_PAYLOAD["
 
 def _registrar_e_verificar(client, fake_db):
     """Cria + verifica um usuário e retorna access_token válido."""
-    r = client.post("/auth/register", json=REGISTER_PAYLOAD)
+    r = client.post("/v1/auth/register", json=REGISTER_PAYLOAD)
     assert r.status_code == 201, r.text
     token = fake_db.emails_sent[-1]["token"]
-    r2 = client.get("/auth/verificar-email", params={"token": token})
+    r2 = client.get("/v1/auth/verificar-email", params={"token": token})
     assert r2.status_code == 200, r2.text
-    r3 = client.post("/auth/login", json=LOGIN_PAYLOAD)
+    r3 = client.post("/v1/auth/login", json=LOGIN_PAYLOAD)
     assert r3.status_code == 200, r3.text
     return r3.json()["access_token"]
 
@@ -54,7 +54,7 @@ PREVER_PAYLOAD = {
 
 def test_quota_guest_retorna_metadados(client, fake_db, monkeypatch):
     monkeypatch.setattr(api_module, "_count_predictions_today", lambda *a, **kw: 0)
-    r = client.get("/quota")
+    r = client.get("/v1/quota")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["is_authenticated"] is False
@@ -67,7 +67,7 @@ def test_quota_guest_retorna_metadados(client, fake_db, monkeypatch):
 def test_quota_auth_retorna_limite_maior(client, fake_db, monkeypatch):
     token = _registrar_e_verificar(client, fake_db)
     monkeypatch.setattr(api_module, "_count_predictions_today", lambda *a, **kw: 3)
-    r = client.get("/quota", headers={"Authorization": f"Bearer {token}"})
+    r = client.get("/v1/quota", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["is_authenticated"] is True
@@ -89,7 +89,7 @@ def _prever_429_setup(monkeypatch, used: int):
 
 def test_prever_429_para_guest_no_terceiro_uso(client, fake_db, monkeypatch):
     _prever_429_setup(monkeypatch, used=api_module.DAILY_LIMIT_GUEST)
-    r = client.post("/prever", json=PREVER_PAYLOAD)
+    r = client.post("/v1/prever", json=PREVER_PAYLOAD)
     assert r.status_code == 429, r.text
     body = r.json()
     detail = body.get("detail") or {}
@@ -107,7 +107,7 @@ def test_prever_429_para_auth_no_decimo_primeiro_uso(client, fake_db, monkeypatc
     token = _registrar_e_verificar(client, fake_db)
     _prever_429_setup(monkeypatch, used=api_module.DAILY_LIMIT_AUTH)
     r = client.post(
-        "/prever",
+        "/v1/prever",
         json=PREVER_PAYLOAD,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -126,11 +126,11 @@ def test_prever_429_para_auth_no_decimo_primeiro_uso(client, fake_db, monkeypatc
 @pytest.mark.parametrize(
     "method,path",
     [
-        ("GET", "/historico"),
-        ("GET", "/comparar"),
-        ("GET", "/export/csv"),
-        ("GET", "/export/pdf"),
-        ("POST", "/favoritos/123"),
+        ("GET", "/v1/historico"),
+        ("GET", "/v1/comparar"),
+        ("GET", "/v1/export/csv"),
+        ("GET", "/v1/export/pdf"),
+        ("POST", "/v1/favoritos/123"),
     ],
 )
 def test_endpoints_de_historico_exigem_autenticacao(client, fake_db, method, path):
@@ -166,7 +166,7 @@ def test_favoritar_avaliacao_inexistente_retorna_404(client, fake_db, monkeypatc
     monkeypatch.setattr(api_module, "engine", _FakeEngine(), raising=True)
 
     r = client.post(
-        "/favoritos/999999",
+        "/v1/favoritos/999999",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert r.status_code == 404, r.text

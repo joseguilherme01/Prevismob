@@ -3,7 +3,7 @@ from __future__ import annotations
 
 
 def test_security_headers_em_rota_publica(client, fake_db):
-    resp = client.get("/status")
+    resp = client.get("/v1/status")
     assert resp.status_code == 200
     assert resp.headers.get("referrer-policy") == "no-referrer"
     assert resp.headers.get("x-content-type-options") == "nosniff"

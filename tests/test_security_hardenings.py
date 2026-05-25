@@ -166,7 +166,7 @@ def test_neutralize_event_label_remove_tags(monkeypatch, raw, expected_contains)
 
 def test_referrer_policy_em_verificar_email(client):
     # Usa a fixture `client` do conftest (DB em memória, SMTP mockado)
-    resp = client.get("/auth/verificar-email", params={"token": "x" * 32})
+    resp = client.get("/v1/auth/verificar-email", params={"token": "x" * 32})
     # independente do resultado (token inválido é 400), o header deve estar presente
     assert resp.headers.get("Referrer-Policy") == "no-referrer"
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
@@ -174,5 +174,5 @@ def test_referrer_policy_em_verificar_email(client):
 
 def test_referrer_policy_em_todas_rotas_auth(client):
     # Cobertura extra: middleware global
-    resp = client.post("/auth/reenviar-verificacao", json={"email": "x@y.com"})
+    resp = client.post("/v1/auth/reenviar-verificacao", json={"email": "x@y.com"})
     assert resp.headers.get("Referrer-Policy") == "no-referrer"
