@@ -4,38 +4,38 @@
 
 ## 1. Identificação
 
-| Campo              | Valor                                              |
-| ------------------ | -------------------------------------------------- |
-| **Nome**           | Relatório de Implementação e Execução de Testes — PrevIsmob |
-| **Versão**         | 1.0                                                |
-| **Data**           | 26/05/2026                                         |
-| **Projeto**        | PrevIsmob — Plataforma de Avaliação de Imóveis     |
-| **Responsável**    | Eduardo Borges de Carvalho (Qualidade e Testes)    |
-| **Implementação**  | José Guilherme Ferreira dos Santos (Backend)        |
+| Campo             | Valor                                                       |
+| ----------------- | ----------------------------------------------------------- |
+| **Nome**          | Relatório de Implementação e Execução de Testes — PrevIsmob |
+| **Versão**        | 1.0                                                         |
+| **Data**          | 26/05/2026                                                  |
+| **Projeto**       | PrevIsmob — Plataforma de Avaliação de Imóveis              |
+| **Responsável**   | Eduardo Borges de Carvalho (Qualidade e Testes)             |
+| **Implementação** | José Guilherme Ferreira dos Santos (Backend)                |
 
 ---
 
 ## 2. Objetivo
 
-Registrar formalmente a implementação e a execução dos testes automatizados realizados no projeto PrevIsmob, documentando cada caso de teste preparado, os resultados obtidos e as conclusões da campanha de testes. Este relatório complementa o [Plano de Teste](PLANO_DE_TESTE.md) e serve como evidência de qualidade para a entrega final do projeto.
+Registrar formalmente a implementação e a execução dos testes automatizados realizados no projeto PrevIsmob. O documento apresenta cada caso de teste preparado, os resultados obtidos e as conclusões da campanha de testes. Este relatório complementa o [Plano de Teste](PLANO_DE_TESTE.md) e serve como evidência de qualidade para a entrega final do projeto.
 
 ---
 
 ## 3. Entradas Utilizadas
 
-| Entrada                             | Descrição                                                                       |
-| ----------------------------------- | ------------------------------------------------------------------------------- |
-| `README_TESTES.md`                  | Estratégia de testes, comandos, checklist manual e critérios de aceite.         |
-| `tests/conftest.py`                 | Configuração global: fixtures `fake_db` e `client`, monkeypatching de banco e e-mail. |
-| `tests/fake_db.py`                  | Implementação do banco em memória (`FakeDB`) que substitui MySQL nos testes.    |
-| `tests/test_api_versioning.py`      | Testes de versionamento de API e header `X-API-Version`.                        |
-| `tests/test_email_verification.py`  | Testes do fluxo de verificação obrigatória de e-mail.                           |
-| `tests/test_quotas_favoritos.py`    | Testes de cotas, favoritos, histórico, comparação e exportação.                 |
-| `tests/test_account_deletion.py`    | Testes de exclusão de conta (LGPD).                                             |
-| `tests/test_security_headers_global.py` | Testes de headers HTTP de segurança globais.                               |
-| `tests/test_security_hardenings.py` | Testes de sanitização de logs e política de referrer.                           |
-| `api.py`                            | Código-fonte do backend; fonte de verdade para comportamento esperado.          |
-| `email_service.py`                  | Serviço de e-mail; verificado quanto a vazamentos de token/e-mail em logs.      |
+| Entrada                                 | Descrição                                                                                    |
+| --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `README_TESTES.md`                      | Estratégia de testes, comandos, checklist manual e critérios de aceite.                      |
+| `tests/conftest.py`                     | Configuração global do teste: prepara o banco de dados simulado em memória e o cliente HTTP. |
+| `tests/fake_db.py`                      | Implementação do banco de dados simulado em memória que substitui o MySQL nos testes.        |
+| `tests/test_api_versioning.py`          | Testes de versionamento da API e do cabeçalho de versão.                                     |
+| `tests/test_email_verification.py`      | Testes do fluxo de verificação obrigatória de e-mail.                                        |
+| `tests/test_quotas_favoritos.py`        | Testes de cotas, favoritos, histórico, comparação e exportação.                              |
+| `tests/test_account_deletion.py`        | Testes de exclusão de conta (LGPD).                                                          |
+| `tests/test_security_headers_global.py` | Testes de cabeçalhos HTTP de segurança globais.                                              |
+| `tests/test_security_hardenings.py`     | Testes de limpeza de logs e política de referência.                                          |
+| `api.py`                                | Código-fonte do backend; fonte de verdade para o comportamento esperado.                     |
+| `email_service.py`                      | Serviço de e-mail; verificado quanto a vazamentos de token ou e-mail nos logs.               |
 
 ---
 
@@ -43,123 +43,126 @@ Registrar formalmente a implementação e a execução dos testes automatizados 
 
 ### 4.1 Infraestrutura de Testes
 
-A implementação dos testes foi realizada de forma a isolar completamente o backend das dependências externas (MySQL, SMTP, Google Maps API), garantindo que a suite execute offline e sem credenciais reais.
+A implementação foi feita de modo a isolar o backend de dependências externas como MySQL, servidor de e-mail e API do Google Maps. Assim, a suíte roda offline e sem credenciais reais.
 
-**`tests/fake_db.py` — Banco em memória**
+**`tests/fake_db.py` — Banco de dados simulado em memória**
 
-Implementa a classe `FakeDB` com dois dataclasses:
-- `FakeUser`: representa um registro da tabela `usuarios` com todos os campos relevantes para autenticação e verificação.
-- `FakeDB`: dicionário de usuários em memória com métodos `get_by_email`, `get_by_id`, `get_by_verif_hash`, `insert_user`, `email_exists`; listas `sessions` e `emails_sent` para rastrear sessões e e-mails enviados.
+Implementa duas estruturas de dados:
 
-**`tests/conftest.py` — Fixtures compartilhadas**
+- `FakeUser`: representa um registro da tabela de usuários com todos os campos usados para autenticação e verificação.
+- `FakeDB`: dicionário de usuários em memória com métodos para buscar por e-mail, por ID e por hash de verificação, além de inserir novos usuários e checar se um e-mail já existe. Mantém ainda listas de sessões e de e-mails enviados.
 
-Define duas fixtures com escopo de função:
+**`tests/conftest.py` — Configurações compartilhadas dos testes**
 
-- `fake_db(monkeypatch)`: cria uma instância limpa de `FakeDB` a cada teste e usa `monkeypatch.setattr` para substituir todos os helpers de acesso a banco do módulo `api` pelos equivalentes em memória. Também substitui `send_verification_email` (tanto em `email_service` quanto em `api`) por um spy que registra `(email, token)` na lista `fake_db.emails_sent`, permitindo que testes recuperem o token puro sem acessar SMTP. Define o `engine` como um objeto-sentinela não nulo para passar os guards `if engine is None` do backend. Suprime as funções de migração runtime.
+Define duas configurações de teste com escopo de função:
 
-- `client(fake_db)`: retorna um `TestClient(api_module.app)` já com `fake_db` ativo, pronto para uso em testes de rotas HTTP.
+- `fake_db`: cria uma instância limpa do banco de dados simulado a cada teste. Substitui as funções reais de acesso ao banco do módulo `api` pelas versões em memória. Também substitui o envio de e-mail por um interceptor de e-mail que guarda o par `(email, token)` em uma lista, permitindo que os testes recuperem o token sem precisar de servidor de e-mail. O motor do banco vira um objeto qualquer não nulo para passar pelas checagens internas. As funções de migração executadas durante a execução são desligadas.
+
+- `client`: retorna um cliente HTTP de teste já com o banco simulado ativo, pronto para uso nos testes de rotas.
 
 **Variáveis de ambiente de teste**
 
-Definidas via `os.environ.setdefault` no início do `conftest.py`:
+Definidas no início do arquivo de configuração:
 
-| Variável                        | Valor em teste                        |
-| ------------------------------- | ------------------------------------- |
-| `SMTP_DEV_MODE`                 | `1` (sem envio SMTP real)             |
-| `APP_BASE_URL`                  | `http://testserver`                   |
-| `EMAIL_VERIFY_TTL_HOURS`        | `24`                                  |
-| `EMAIL_VERIFY_RESEND_COOLDOWN_MIN` | `2`                                |
-| `JWT_SECRET_KEY`                | `test-secret-key-for-unit-tests`      |
+| Variável                           | Valor em teste                   |
+| ---------------------------------- | -------------------------------- |
+| `SMTP_DEV_MODE`                    | `1` (não envia e-mail real)      |
+| `APP_BASE_URL`                     | `http://testserver`              |
+| `EMAIL_VERIFY_TTL_HOURS`           | `24`                             |
+| `EMAIL_VERIFY_RESEND_COOLDOWN_MIN` | `2`                              |
+| `JWT_SECRET_KEY`                   | `test-secret-key-for-unit-tests` |
 
 ### 4.2 Técnicas de Isolamento Utilizadas
 
-| Técnica              | Aplicação                                                                        |
-| -------------------- | -------------------------------------------------------------------------------- |
-| `monkeypatch.setattr` | Substituição de funções de banco, e-mail, e contagem de previsões em runtime.  |
-| Spy de e-mail        | `send_verification_email` registra o token puro para recuperação nos testes.    |
-| Fake de engine       | `engine` substituído por `object()` para passar guards sem conectar ao MySQL.    |
-| Parametrização       | `@pytest.mark.parametrize` para cobrir múltiplos cenários com o mesmo código.   |
-| Classes fake inline  | `_FakeEngine`, `_FakeConn`, `_FakeRow`, `_FakeSMTP` definidos dentro dos testes para simular comportamentos específicos. |
+Cada técnica abaixo tem como objetivo evitar que o teste dependa de sistemas externos.
+
+| Técnica                                         | Aplicação                                                                                           |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Substituição de componentes reais por simulados | Trocamos as funções de banco, e-mail e contagem de previsões por versões falsas durante a execução. |
+| Interceptor de e-mail                           | A função de envio guarda o token em uma lista para que o teste possa recuperá-lo.                   |
+| Motor de banco falso                            | O motor é substituído por um objeto qualquer, evitando conexão real com o MySQL.                    |
+| Repetição com parâmetros                        | Permite cobrir vários cenários reaproveitando o mesmo código de teste.                              |
+| Classes falsas dentro do teste                  | Pequenas classes definidas dentro do próprio teste simulam comportamentos específicos.              |
 
 ---
 
 ## 5. Casos de Teste Preparados para Execução
 
-A tabela a seguir lista todos os 44 casos de teste identificados na suite. Casos parametrizados são expandidos individualmente, conforme a execução real do pytest.
+A tabela a seguir lista os 44 casos de teste implementados na suíte. Casos repetidos com parâmetros são contados individualmente, como aparecem na execução real.
 
-### 5.1 Módulo: Versionamento de API (`test_api_versioning.py`)
+### 5.1 Módulo: Versionamento de API
 
-| ID     | Função de Teste                          | Funcionalidade Relacionada                         | Status        | Observações                                 |
-| ------ | ---------------------------------------- | -------------------------------------------------- | ------------- | ------------------------------------------- |
-| TC-001 | `test_v1_status_retorna_metadados`       | `GET /v1/status` — metadados da API                | Implementado  | Verifica campos `api_ativa` e `modelo_carregado`. |
-| TC-002 | `test_v1_status_retorna_200`             | `GET /v1/status` — status HTTP                     | Implementado  | Verifica código 200.                         |
-| TC-003 | `test_v1_header_x_api_version_presente`  | Header `X-API-Version: v1` em todas as respostas   | Implementado  | Verifica presença e valor do header.         |
-| TC-004 | `test_legacy_path_retorna_404`           | Rota `/status` sem prefixo `/v1/` retorna 404      | Implementado  | Confirma ausência de rotas legadas.          |
+| ID     | Funcionalidade                                    | Status       | Observações                                         |
+| ------ | ------------------------------------------------- | ------------ | --------------------------------------------------- |
+| TC-001 | Verificação do status da API                      | Implementado | Confirma que a API está ativa e o modelo carregado. |
+| TC-002 | Código de resposta do status                      | Implementado | Confirma que a resposta é bem-sucedida.             |
+| TC-003 | Cabeçalho de versão da API presente nas respostas | Implementado | Confirma que o cabeçalho indica a versão correta.   |
+| TC-004 | Rotas antigas sem o prefixo de versão             | Implementado | Garante que endereços antigos foram removidos.      |
 
-### 5.2 Módulo: Verificação de E-mail (`test_email_verification.py`)
+### 5.2 Módulo: Verificação de E-mail
 
-| ID     | Função de Teste                                        | Funcionalidade Relacionada                              | Status        | Observações                                                   |
-| ------ | ------------------------------------------------------ | ------------------------------------------------------- | ------------- | ------------------------------------------------------------- |
-| TC-005 | `test_register_cria_usuario_nao_verificado`            | `POST /v1/auth/register` — cadastro                     | Implementado  | Verifica que o token não é armazenado em texto plano.         |
-| TC-006 | `test_login_de_nao_verificado_retorna_403`             | `POST /v1/auth/login` — bloqueio pré-verificação        | Implementado  | Verifica código 403 e mensagem "Verifique".                   |
-| TC-007 | `test_verificar_com_token_valido_marca_como_verificado`| `GET /v1/auth/verificar-email` — fluxo feliz            | Implementado  | Verifica `status=verificado` e limpeza do hash no banco.      |
-| TC-008 | `test_verificar_com_token_invalido_retorna_400`        | `GET /v1/auth/verificar-email` — token inválido         | Implementado  | Particionamento de equivalência: token inexistente.           |
-| TC-009 | `test_verificar_com_token_expirado_retorna_400`        | `GET /v1/auth/verificar-email` — token expirado         | Implementado  | Força expiração no passado via `fake_db`; verifica "expirado" na resposta. |
-| TC-010 | `test_verificar_idempotente_quando_ja_verificado`      | `GET /v1/auth/verificar-email` — idempotência           | Implementado  | Simula residual de hash após verificação; verifica `status=ja_verificado`. |
-| TC-011 | `test_reenviar_respeita_rate_limit`                    | `POST /v1/auth/reenviar-verificacao` — cooldown         | Implementado  | Valor-limite: bloqueia dentro do cooldown; reenvia após expirar. |
-| TC-012 | `test_reenviar_nao_vaza_enumeracao`                    | `POST /v1/auth/reenviar-verificacao` — enumeração       | Implementado  | E-mail inexistente recebe resposta neutra (`status=ok`).      |
-| TC-013 | `test_login_apos_verificar_retorna_200_com_token`      | `POST /v1/auth/login` — fluxo feliz                     | Implementado  | Verifica `access_token`, `refresh_token`, `token_type=Bearer`. |
+| ID     | Funcionalidade                                          | Status       | Observações                                                             |
+| ------ | ------------------------------------------------------- | ------------ | ----------------------------------------------------------------------- |
+| TC-005 | Cadastro cria usuário ainda não verificado              | Implementado | Confirma que o token não fica salvo em texto aberto no banco.           |
+| TC-006 | Login bloqueado antes da verificação                    | Implementado | Confirma código de erro e mensagem orientando a verificação.            |
+| TC-007 | Verificação com token válido marca o e-mail confirmado  | Implementado | Confirma que o usuário fica como verificado e o hash é apagado.         |
+| TC-008 | Verificação com token inválido é recusada               | Implementado | Testamos com dados válidos e inválidos: token inexistente é rejeitado.  |
+| TC-009 | Verificação com token expirado é recusada               | Implementado | Força a data de validade no passado e confirma a recusa.                |
+| TC-010 | Verificação pode ser feita mais de uma vez sem problema | Implementado | Pode ser executado mais de uma vez com o mesmo resultado.               |
+| TC-011 | Reenvio respeita o tempo mínimo entre tentativas        | Implementado | Bloqueia novo envio dentro do tempo de espera e libera depois dele.     |
+| TC-012 | Reenvio não revela se o e-mail está cadastrado          | Implementado | E-mail desconhecido recebe resposta igual à de um e-mail cadastrado.    |
+| TC-013 | Login funciona após confirmar o e-mail                  | Implementado | Confirma a entrega dos dois tokens de acesso e do tipo de autenticação. |
 
-### 5.3 Módulo: Cotas, Favoritos e Histórico (`test_quotas_favoritos.py`)
+### 5.3 Módulo: Cotas, Favoritos e Histórico
 
-| ID     | Função de Teste                                                       | Funcionalidade Relacionada                             | Status        | Observações                                                          |
-| ------ | --------------------------------------------------------------------- | ------------------------------------------------------ | ------------- | -------------------------------------------------------------------- |
-| TC-014 | `test_quota_guest_retorna_metadados`                                  | `GET /v1/quota` — cota guest                           | Implementado  | Verifica `is_authenticated=False`, `daily_limit=2`, `used_today=0`. |
-| TC-015 | `test_quota_auth_retorna_limite_maior`                                | `GET /v1/quota` — cota autenticado                     | Implementado  | Verifica `is_authenticated=True`, `daily_limit=10`.                 |
-| TC-016 | `test_prever_429_para_guest_no_terceiro_uso`                          | `POST /v1/prever` — 429 ao exceder cota guest          | Implementado  | Força `_count_predictions_today=2`; verifica 429, `Retry-After` e CTA. |
-| TC-017 | `test_prever_429_para_auth_no_decimo_primeiro_uso`                    | `POST /v1/prever` — 429 ao exceder cota auth           | Implementado  | Força `_count_predictions_today=10`; verifica 429 e payload de quota. |
-| TC-018 | `test_endpoints_de_historico_exigem_autenticacao[GET /v1/historico]`  | Autenticação obrigatória em `/v1/historico`            | Implementado  | Sem token → 401 ou 403.                                              |
-| TC-019 | `test_endpoints_de_historico_exigem_autenticacao[GET /v1/comparar]`   | Autenticação obrigatória em `/v1/comparar`             | Implementado  | Sem token → 401 ou 403.                                              |
-| TC-020 | `test_endpoints_de_historico_exigem_autenticacao[GET /v1/export/csv]` | Autenticação obrigatória em `/v1/export/csv`           | Implementado  | Sem token → 401 ou 403.                                              |
-| TC-021 | `test_endpoints_de_historico_exigem_autenticacao[GET /v1/export/pdf]` | Autenticação obrigatória em `/v1/export/pdf`           | Implementado  | Sem token → 401 ou 403.                                              |
-| TC-022 | `test_endpoints_de_historico_exigem_autenticacao[POST /v1/favoritos/123]` | Autenticação obrigatória em `/v1/favoritos/{id}`  | Implementado  | Sem token → 401 ou 403.                                              |
-| TC-023 | `test_favoritar_avaliacao_inexistente_retorna_404`                    | `POST /v1/favoritos/{id}` — avaliação inexistente      | Implementado  | Não distingue ID inexistente de ID alheio (proteção de enumeração).  |
-| TC-024 | `test_build_quota_payload_estrutura`                                  | Unitário: `_build_quota_payload`                       | Implementado  | Verifica presença das chaves obrigatórias e valores de limite.       |
-| TC-025 | `test_seconds_until_next_day_positivo`                                | Unitário: `_seconds_until_next_day`                    | Implementado  | Verifica que o retorno é `0 < s <= 86400`.                          |
+| ID     | Funcionalidade                                                    | Status       | Observações                                                          |
+| ------ | ----------------------------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| TC-014 | Consulta de cota para visitante                                   | Implementado | Confirma limite diário menor para quem não está logado.              |
+| TC-015 | Consulta de cota para usuário logado                              | Implementado | Confirma limite diário maior para usuários autenticados.             |
+| TC-016 | Bloqueio do visitante ao passar do limite diário                  | Implementado | Confirma código de limite atingido, tempo de espera e mensagem.      |
+| TC-017 | Bloqueio do usuário logado ao passar do limite diário             | Implementado | Confirma código de limite atingido e dados de cota.                  |
+| TC-018 | Histórico exige usuário autenticado                               | Implementado | Sem autenticação a chamada é recusada.                               |
+| TC-019 | Comparação exige usuário autenticado                              | Implementado | Sem autenticação a chamada é recusada.                               |
+| TC-020 | Exportação em planilha exige usuário autenticado                  | Implementado | Sem autenticação a chamada é recusada.                               |
+| TC-021 | Exportação em PDF exige usuário autenticado                       | Implementado | Sem autenticação a chamada é recusada.                               |
+| TC-022 | Marcar favorito exige usuário autenticado                         | Implementado | Sem autenticação a chamada é recusada.                               |
+| TC-023 | Favoritar avaliação que não existe retorna erro de não encontrado | Implementado | Não diferencia avaliação inexistente de avaliação de outra pessoa.   |
+| TC-024 | Estrutura dos dados retornados na cota                            | Implementado | Confirma a presença das chaves obrigatórias e dos valores de limite. |
+| TC-025 | Cálculo de segundos até o próximo dia                             | Implementado | Confirma que o valor está dentro do intervalo de um dia.             |
 
-### 5.4 Módulo: Exclusão de Conta — LGPD (`test_account_deletion.py`)
+### 5.4 Módulo: Exclusão de Conta — LGPD
 
-| ID     | Função de Teste                                  | Funcionalidade Relacionada                           | Status        | Observações                                                            |
-| ------ | ------------------------------------------------ | ---------------------------------------------------- | ------------- | ---------------------------------------------------------------------- |
-| TC-026 | `test_delete_me_sem_auth_retorna_401_ou_403`     | `DELETE /v1/auth/me` — sem autenticação              | Implementado  | HTTPBearer sem credenciais retorna 403 por padrão no FastAPI.          |
-| TC-027 | `test_delete_me_anonimiza_conta`                 | `DELETE /v1/auth/me` — anonimização de dados pessoais | Implementado | Verifica que e-mail original não existe mais e login subsequente falha. |
-| TC-028 | `test_delete_me_revoga_sessoes`                  | `DELETE /v1/auth/me` — revogação de sessões          | Implementado  | Verifica que não restam sessões para o usuário anonimizado.            |
-| TC-029 | `test_delete_me_e_idempotente_em_segunda_chamada`| `DELETE /v1/auth/me` — idempotência                  | Implementado  | Segunda chamada com token do usuário já removido retorna 401/403/404.  |
+| ID     | Funcionalidade                                 | Status       | Observações                                               |
+| ------ | ---------------------------------------------- | ------------ | --------------------------------------------------------- |
+| TC-026 | Exclusão de conta exige autenticação via token | Implementado | Chamada sem autenticação é recusada.                      |
+| TC-027 | Exclusão anonimiza os dados pessoais da conta  | Implementado | E-mail original some e o login com ele passa a falhar.    |
+| TC-028 | Exclusão encerra todas as sessões abertas      | Implementado | Nenhuma sessão sobra para o usuário anonimizado.          |
+| TC-029 | Repetir a exclusão não causa erro              | Implementado | Pode ser executado mais de uma vez com o mesmo resultado. |
 
-### 5.5 Módulo: Headers de Segurança Globais (`test_security_headers_global.py`)
+### 5.5 Módulo: Cabeçalhos de Segurança Globais
 
-| ID     | Função de Teste                             | Funcionalidade Relacionada                           | Status        | Observações                                                             |
-| ------ | ------------------------------------------- | ---------------------------------------------------- | ------------- | ----------------------------------------------------------------------- |
-| TC-030 | `test_security_headers_em_rota_publica`     | Headers de segurança em `/v1/status`                 | Implementado  | Verifica CSP (`default-src 'self'`, `frame-ancestors 'none'`), `X-Frame-Options`, `Referrer-Policy`, `X-Content-Type-Options`. |
-| TC-031 | `test_security_headers_em_rota_v1`          | Headers de segurança em rota `/v1/`                  | Implementado  | Verifica `X-Frame-Options: DENY` e CSP na mesma rota (cobertura extra). |
+| ID     | Funcionalidade                                  | Status       | Observações                                                        |
+| ------ | ----------------------------------------------- | ------------ | ------------------------------------------------------------------ |
+| TC-030 | Cabeçalhos de segurança em rota pública         | Implementado | Confirma as principais proteções contra clickjacking e injeção.    |
+| TC-031 | Cabeçalhos de segurança em rota da versão atual | Implementado | Confirma proteção contra exibição em frame e política de conteúdo. |
 
-### 5.6 Módulo: Hardenings de Segurança e Logs (`test_security_hardenings.py`)
+### 5.6 Módulo: Proteções de Segurança e Logs
 
-| ID     | Função de Teste                                                                    | Funcionalidade Relacionada                                  | Status        | Observações                                                              |
-| ------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------- | ------------------------------------------------------------------------ |
-| TC-032 | `test_logs_nao_contem_token_fora_de_development[production]`                       | Sanitização de logs em `APP_ENV=production`                 | Implementado  | Token, link, e-mail e label `[DEV]` não devem aparecer no log.          |
-| TC-033 | `test_logs_nao_contem_token_fora_de_development[staging]`                          | Sanitização de logs em `APP_ENV=staging`                    | Implementado  | Idem `production`.                                                       |
-| TC-034 | `test_logs_nao_contem_token_fora_de_development[prod]`                             | Sanitização de logs em `APP_ENV=prod`                       | Implementado  | Idem `production`.                                                       |
-| TC-035 | `test_log_entrega_real_quando_smtp_envia`                                          | Log marca `entrega=real` quando SMTP entrega com sucesso    | Implementado  | Usa `_FakeSMTP` para simular envio sem rede; verifica ausência de `mode=dev`. |
-| TC-036 | `test_logs_incluem_link_em_development`                                            | Em `APP_ENV=development`, log inclui link completo          | Implementado  | Verificação de que o modo dev expõe o link (comportamento intencional).  |
-| TC-037 | `test_label_dev_preservado_em_development`                                         | Label `[DEV]` aparece em logs de desenvolvimento            | Implementado  | Verifica distinção visual entre ambientes.                               |
-| TC-038 | `test_neutralize_event_label_remove_tags[verification email [DEV]-...]`            | `_neutralize_event_label` — remoção de tags em string normal | Implementado | Verifica que `[` e `]` são removidos do resultado.                      |
-| TC-039 | `test_neutralize_event_label_remove_tags[verification email sent-...]`             | `_neutralize_event_label` — string sem tags                 | Implementado  | Sem tags: string retorna inalterada.                                     |
-| TC-040 | `test_neutralize_event_label_remove_tags[[DEV] verification email queued-...]`     | `_neutralize_event_label` — tag no início com espaços       | Implementado  | Verifica remoção de tag e trimming.                                      |
-| TC-041 | `test_neutralize_event_label_remove_tags[[dev] x [INFO] y-...]`                   | `_neutralize_event_label` — múltiplas tags case-insensitive | Implementado  | Verifica remoção de múltiplas tags.                                      |
-| TC-042 | `test_neutralize_event_label_remove_tags[-verification email queued]`              | `_neutralize_event_label` — string vazia retorna default    | Implementado  | String vazia: retorna mensagem padrão.                                   |
-| TC-043 | `test_referrer_policy_em_verificar_email`                                          | `Referrer-Policy: no-referrer` em `/v1/auth/verificar-email`| Implementado  | Verifica também `X-Content-Type-Options: nosniff` na mesma resposta.    |
-| TC-044 | `test_referrer_policy_em_todas_rotas_auth`                                         | `Referrer-Policy` em rota `/v1/auth/reenviar-verificacao`   | Implementado  | Cobertura extra do middleware global de segurança.                       |
+| ID     | Funcionalidade                                                       | Status       | Observações                                                             |
+| ------ | -------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------- |
+| TC-032 | Logs não mostram token em ambiente de produção                       | Implementado | Token, link, e-mail e marcador de desenvolvimento ficam de fora do log. |
+| TC-033 | Logs não mostram token em ambiente de homologação                    | Implementado | Mesma proteção do ambiente de produção.                                 |
+| TC-034 | Logs não mostram token em ambiente identificado como produção        | Implementado | Mesma proteção do ambiente de produção.                                 |
+| TC-035 | Log marca entrega real quando o servidor de e-mail envia com sucesso | Implementado | Usa servidor de e-mail simulado para evitar uso de rede.                |
+| TC-036 | Em ambiente de desenvolvimento, o log inclui o link de verificação   | Implementado | Comportamento intencional para facilitar testes locais.                 |
+| TC-037 | Marcador de desenvolvimento aparece nos logs locais                  | Implementado | Diferencia visualmente o ambiente local dos demais.                     |
+| TC-038 | Função de limpeza remove marcadores entre colchetes                  | Implementado | Confirma a remoção dos colchetes e do conteúdo dentro deles.            |
+| TC-039 | Função de limpeza não altera texto sem marcadores                    | Implementado | Texto sem marcadores volta inalterado.                                  |
+| TC-040 | Função de limpeza remove marcador no começo da mensagem              | Implementado | Confirma a remoção e o ajuste dos espaços.                              |
+| TC-041 | Função de limpeza remove vários marcadores na mesma mensagem         | Implementado | Trata diferenças de maiúsculas e minúsculas.                            |
+| TC-042 | Função de limpeza retorna mensagem padrão quando recebe texto vazio  | Implementado | Garante um valor seguro para registro.                                  |
+| TC-043 | Política de referência aplicada na rota de verificação de e-mail     | Implementado | Também confirma a proteção contra adivinhação de tipo de arquivo.       |
+| TC-044 | Política de referência aplicada em todas as rotas de autenticação    | Implementado | Cobertura extra da proteção global.                                     |
 
 ---
 
@@ -167,11 +170,13 @@ A tabela a seguir lista todos os 44 casos de teste identificados na suite. Casos
 
 ### 6.1 Período de Execução
 
-| Fase                        | Período                        |
-| --------------------------- | ------------------------------ |
-| Implementação inicial       | Março – Abril 2026             |
-| Atualização de rotas (`/v1/`) | Maio 2026                    |
-| Execução final documentada  | 26/05/2026                     |
+| Fase                         | Período            |
+| ---------------------------- | ------------------ |
+| Implementação inicial        | Março – Abril 2026 |
+| Atualização de rotas para v1 | Maio 2026          |
+| Execução final documentada   | 26/05/2026         |
+
+|
 
 ### 6.2 Ferramenta e Comando de Execução
 
@@ -179,7 +184,7 @@ A tabela a seguir lista todos os 44 casos de teste identificados na suite. Casos
 # Ativar ambiente virtual
 .venv\Scripts\Activate.ps1
 
-# Executar a suite completa
+# Executar a suíte completa
 pytest -q
 
 # Resultado esperado:
@@ -188,90 +193,90 @@ pytest -q
 
 ### 6.3 Critérios Aplicados na Execução
 
-- Todos os testes executados a partir da raiz do projeto.
-- `FakeDB` ativo via fixture `fake_db` (nenhum acesso a MySQL real).
-- `SMTP_DEV_MODE=1` ativo (nenhum e-mail real enviado).
-- Warnings de `DeprecationWarning: datetime.utcnow()` aceitos como esperados (documentados em `README_TESTES.md`).
+- Todos os testes rodam a partir da raiz do projeto.
+- O banco de dados simulado em memória fica ativo em todos os testes. Nenhum acesso ao MySQL real é feito.
+- O modo de desenvolvimento do servidor de e-mail fica ligado. Nenhum e-mail real é enviado.
+- Avisos de depreciação de datas são aceitos como esperados, conforme registrado em `README_TESTES.md`.
 
 ---
 
 ## 7. Registro de Resultados
 
-A tabela a seguir registra o resultado individual de cada caso de teste na execução realizada em 26/05/2026.
+A tabela a seguir mostra o resultado individual de cada caso de teste na execução realizada em 26/05/2026.
 
 ### 7.1 Módulo: Versionamento de API
 
-| ID     | Resultado Esperado                                   | Resultado Obtido                                    | Status    | Defeito |
-| ------ | ---------------------------------------------------- | --------------------------------------------------- | --------- | ------- |
-| TC-001 | HTTP 200; `api_ativa=true`; `modelo_carregado` presente | HTTP 200; campos presentes no JSON                | Aprovado  | —       |
-| TC-002 | HTTP 200                                             | HTTP 200                                            | Aprovado  | —       |
-| TC-003 | Header `x-api-version: v1` presente                 | Header presente com valor `v1`                      | Aprovado  | —       |
-| TC-004 | HTTP 404                                             | HTTP 404                                            | Aprovado  | —       |
+| ID     | O que foi testado                 | O que era esperado                                     | O que aconteceu                          | Resultado |
+| ------ | --------------------------------- | ------------------------------------------------------ | ---------------------------------------- | --------- |
+| TC-001 | Verificação do status da API      | Resposta bem-sucedida com API ativa e modelo carregado | Resposta bem-sucedida e campos presentes | Aprovado  |
+| TC-002 | Código de resposta do status      | Código de sucesso                                      | Código de sucesso                        | Aprovado  |
+| TC-003 | Cabeçalho de versão presente      | Cabeçalho indicando a versão atual                     | Cabeçalho presente com o valor correto   | Aprovado  |
+| TC-004 | Rota antiga sem prefixo de versão | Erro de endereço não encontrado                        | Erro de endereço não encontrado          | Aprovado  |
 
 ### 7.2 Módulo: Verificação de E-mail
 
-| ID     | Resultado Esperado                                                | Resultado Obtido                                         | Status    | Defeito |
-| ------ | ----------------------------------------------------------------- | -------------------------------------------------------- | --------- | ------- |
-| TC-005 | HTTP 201; `email_verificacao_enviado=true`; hash ≠ token puro    | HTTP 201; campos corretos; hash armazenado diferente do token | Aprovado | — |
-| TC-006 | HTTP 403; mensagem contendo "Verifique"                           | HTTP 403; mensagem correta                               | Aprovado  | —       |
-| TC-007 | HTTP 200; `status=verificado`; `email_verificado_em` não nulo; hash nulo | HTTP 200; todos os campos verificados            | Aprovado  | —       |
-| TC-008 | HTTP 400                                                          | HTTP 400                                                 | Aprovado  | —       |
-| TC-009 | HTTP 400; mensagem contendo "expirado"                            | HTTP 400; mensagem correta                               | Aprovado  | —       |
-| TC-010 | HTTP 200; `status=ja_verificado`                                  | HTTP 200; status correto                                 | Aprovado  | —       |
-| TC-011 | Reenvio bloqueado dentro do cooldown; reenviado após expiração    | Comportamento correto em ambos os cenários               | Aprovado  | —       |
-| TC-012 | HTTP 200; `status=ok`; 0 e-mails enviados                        | HTTP 200; resposta neutra; nenhum e-mail disparado       | Aprovado  | —       |
-| TC-013 | HTTP 200; `access_token` e `refresh_token` presentes; `token_type=Bearer` | HTTP 200; campos corretos                      | Aprovado  | —       |
+| ID     | O que foi testado                                      | O que era esperado                                                       | O que aconteceu                          | Resultado |
+| ------ | ------------------------------------------------------ | ------------------------------------------------------------------------ | ---------------------------------------- | --------- |
+| TC-005 | Cadastro de novo usuário                               | Usuário criado, sinal de e-mail enviado e token guardado de forma segura | Usuário criado e dados corretos no banco | Aprovado  |
+| TC-006 | Login antes de verificar o e-mail                      | Recusa com mensagem orientando a verificação                             | Recusa com mensagem correta              | Aprovado  |
+| TC-007 | Verificação com token válido                           | Conta marcada como verificada e hash apagado                             | Todos os campos verificados corretamente | Aprovado  |
+| TC-008 | Verificação com token inválido                         | Recusa por dado inválido                                                 | Recusa por dado inválido                 | Aprovado  |
+| TC-009 | Verificação com token expirado                         | Recusa com mensagem de expirado                                          | Recusa com mensagem correta              | Aprovado  |
+| TC-010 | Verificação executada de novo após já estar verificado | Resposta indicando que já está verificado                                | Resposta correta                         | Aprovado  |
+| TC-011 | Tempo mínimo entre reenvios                            | Bloqueio dentro do tempo e liberação depois                              | Comportamento correto nos dois cenários  | Aprovado  |
+| TC-012 | Reenvio para e-mail inexistente                        | Resposta neutra e nenhum e-mail disparado                                | Resposta neutra e nenhum e-mail enviado  | Aprovado  |
+| TC-013 | Login após verificar o e-mail                          | Entrega dos dois tokens de acesso e do tipo de autenticação              | Tudo entregue corretamente               | Aprovado  |
 
 ### 7.3 Módulo: Cotas, Favoritos e Histórico
 
-| ID     | Resultado Esperado                                                       | Resultado Obtido                                   | Status    | Defeito |
-| ------ | ------------------------------------------------------------------------ | -------------------------------------------------- | --------- | ------- |
-| TC-014 | HTTP 200; `is_authenticated=false`; `daily_limit=2`; `used_today=0`     | HTTP 200; payload correto                          | Aprovado  | —       |
-| TC-015 | HTTP 200; `is_authenticated=true`; `daily_limit=10`; `used_today=3`     | HTTP 200; payload correto                          | Aprovado  | —       |
-| TC-016 | HTTP 429; `limit_reached=true`; header `Retry-After`; CTA com "conta"  | HTTP 429; todos os campos verificados              | Aprovado  | —       |
-| TC-017 | HTTP 429; `limit_reached=true`; `is_authenticated=true`                 | HTTP 429; payload correto                          | Aprovado  | —       |
-| TC-018 | HTTP 401 ou 403 para `GET /v1/historico` sem token                      | HTTP 403                                           | Aprovado  | —       |
-| TC-019 | HTTP 401 ou 403 para `GET /v1/comparar` sem token                       | HTTP 403                                           | Aprovado  | —       |
-| TC-020 | HTTP 401 ou 403 para `GET /v1/export/csv` sem token                     | HTTP 403                                           | Aprovado  | —       |
-| TC-021 | HTTP 401 ou 403 para `GET /v1/export/pdf` sem token                     | HTTP 403                                           | Aprovado  | —       |
-| TC-022 | HTTP 401 ou 403 para `POST /v1/favoritos/123` sem token                 | HTTP 403                                           | Aprovado  | —       |
-| TC-023 | HTTP 404 para avaliação inexistente com usuário autenticado             | HTTP 404                                           | Aprovado  | —       |
-| TC-024 | Payload com chaves obrigatórias; `limit_reached=true`; `remaining_today=0` | Payload correto                                 | Aprovado  | —       |
-| TC-025 | `0 < retorno <= 86400`                                                  | Valor dentro do intervalo esperado                 | Aprovado  | —       |
+| ID     | O que foi testado                                | O que era esperado                                                    | O que aconteceu             | Resultado |
+| ------ | ------------------------------------------------ | --------------------------------------------------------------------- | --------------------------- | --------- |
+| TC-014 | Cota de visitante                                | Resposta com limite diário menor e zero usos                          | Dados retornados corretos   | Aprovado  |
+| TC-015 | Cota de usuário logado                           | Resposta com limite diário maior                                      | Dados retornados corretos   | Aprovado  |
+| TC-016 | Bloqueio do visitante por excesso                | Limite atingido com tempo de espera e mensagem orientando criar conta | Todos os campos verificados | Aprovado  |
+| TC-017 | Bloqueio do usuário logado por excesso           | Limite atingido para usuário autenticado                              | Dados retornados corretos   | Aprovado  |
+| TC-018 | Acesso ao histórico sem autenticação             | Recusa do acesso                                                      | Acesso recusado             | Aprovado  |
+| TC-019 | Acesso à comparação sem autenticação             | Recusa do acesso                                                      | Acesso recusado             | Aprovado  |
+| TC-020 | Acesso à exportação em planilha sem autenticação | Recusa do acesso                                                      | Acesso recusado             | Aprovado  |
+| TC-021 | Acesso à exportação em PDF sem autenticação      | Recusa do acesso                                                      | Acesso recusado             | Aprovado  |
+| TC-022 | Tentativa de favoritar sem autenticação          | Recusa do acesso                                                      | Acesso recusado             | Aprovado  |
+| TC-023 | Favoritar avaliação inexistente                  | Erro de não encontrado                                                | Erro de não encontrado      | Aprovado  |
+| TC-024 | Estrutura dos dados retornados na cota           | Conjunto completo de chaves obrigatórias e limites                    | Estrutura correta           | Aprovado  |
+| TC-025 | Cálculo de segundos até o próximo dia            | Valor dentro do intervalo de um dia                                   | Valor dentro do intervalo   | Aprovado  |
 
 ### 7.4 Módulo: Exclusão de Conta — LGPD
 
-| ID     | Resultado Esperado                                                      | Resultado Obtido                                   | Status    | Defeito |
-| ------ | ----------------------------------------------------------------------- | -------------------------------------------------- | --------- | ------- |
-| TC-026 | HTTP 401 ou 403                                                         | HTTP 403                                           | Aprovado  | —       |
-| TC-027 | HTTP 200; `status=conta_excluida`; e-mail original não localizado; login falha | HTTP 200; anonimização verificada            | Aprovado  | —       |
-| TC-028 | HTTP 200; nenhuma sessão remanescente para o usuário anonimizado        | HTTP 200; sessões revogadas                        | Aprovado  | —       |
-| TC-029 | Segunda chamada retorna 401, 403 ou 404                                 | HTTP 401/403/404 (sem 500)                         | Aprovado  | —       |
+| ID     | O que foi testado                               | O que era esperado                                                | O que aconteceu         | Resultado |
+| ------ | ----------------------------------------------- | ----------------------------------------------------------------- | ----------------------- | --------- |
+| TC-026 | Exclusão de conta sem autenticação              | Acesso recusado                                                   | Acesso recusado         | Aprovado  |
+| TC-027 | Exclusão de conta com autenticação válida       | Confirmação de conta excluída, e-mail original some e login falha | Anonimização confirmada | Aprovado  |
+| TC-028 | Estado das sessões após excluir a conta         | Nenhuma sessão sobra para o usuário                               | Sessões encerradas      | Aprovado  |
+| TC-029 | Segunda tentativa de exclusão com o mesmo token | Recusa segura, sem erro interno                                   | Recusa adequada         | Aprovado  |
 
-### 7.5 Módulo: Headers de Segurança Globais
+### 7.5 Módulo: Cabeçalhos de Segurança Globais
 
-| ID     | Resultado Esperado                                                    | Resultado Obtido                     | Status    | Defeito |
-| ------ | --------------------------------------------------------------------- | ------------------------------------ | --------- | ------- |
-| TC-030 | `Referrer-Policy: no-referrer`; `X-Content-Type-Options: nosniff`; `X-Frame-Options: DENY`; CSP com `default-src 'self'` e `frame-ancestors 'none'` | Todos os headers presentes com valores corretos | Aprovado | — |
-| TC-031 | `X-Frame-Options: DENY`; CSP com `default-src 'self'`               | Headers presentes                    | Aprovado  | —       |
+| ID     | O que foi testado                               | O que era esperado                                       | O que aconteceu               | Resultado |
+| ------ | ----------------------------------------------- | -------------------------------------------------------- | ----------------------------- | --------- |
+| TC-030 | Cabeçalhos de segurança em rota pública         | Conjunto completo de proteções padrão                    | Todos os cabeçalhos presentes | Aprovado  |
+| TC-031 | Cabeçalhos de segurança em rota da versão atual | Proteção contra exibição em frame e política de conteúdo | Cabeçalhos presentes          | Aprovado  |
 
-### 7.6 Módulo: Hardenings de Segurança e Logs
+### 7.6 Módulo: Proteções de Segurança e Logs
 
-| ID     | Resultado Esperado                                                              | Resultado Obtido                              | Status    | Defeito |
-| ------ | ------------------------------------------------------------------------------- | --------------------------------------------- | --------- | ------- |
-| TC-032 | Nenhum log contém token, link, e-mail em claro ou label `[DEV]`; `entrega=simulada` presente | Todos os critérios atendidos        | Aprovado  | —       |
-| TC-033 | Idem TC-032 para `APP_ENV=staging`                                             | Todos os critérios atendidos                  | Aprovado  | —       |
-| TC-034 | Idem TC-032 para `APP_ENV=prod`                                                | Todos os critérios atendidos                  | Aprovado  | —       |
-| TC-035 | Log contém `entrega=real`; ausência de `mode=dev`, token e e-mail em claro     | Critérios atendidos com `_FakeSMTP`           | Aprovado  | —       |
-| TC-036 | Log contém token e URL base em `APP_ENV=development`                           | Token e URL presentes no log                  | Aprovado  | —       |
-| TC-037 | Log contém string `[DEV]` em `APP_ENV=development`                             | Label `[DEV]` presente                        | Aprovado  | —       |
-| TC-038 | Saída sem `[` e `]`; contém "verification email"                               | Tags removidas; conteúdo preservado           | Aprovado  | —       |
-| TC-039 | Saída inalterada ("verification email sent")                                    | String retornada corretamente                 | Aprovado  | —       |
-| TC-040 | Tags removidas; conteúdo "verification email queued" preservado                 | Resultado correto                             | Aprovado  | —       |
-| TC-041 | Múltiplas tags removidas; conteúdo residual preservado                          | Resultado correto                             | Aprovado  | —       |
-| TC-042 | String vazia retorna mensagem padrão ("verification email queued")             | Mensagem padrão retornada                     | Aprovado  | —       |
-| TC-043 | `Referrer-Policy: no-referrer`; `X-Content-Type-Options: nosniff` em resposta 400 | Headers presentes independentemente do status HTTP | Aprovado | — |
-| TC-044 | `Referrer-Policy: no-referrer` em `POST /v1/auth/reenviar-verificacao`         | Header presente                               | Aprovado  | —       |
+| ID     | O que foi testado                                           | O que era esperado                                            | O que aconteceu                           | Resultado |
+| ------ | ----------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------- | --------- |
+| TC-032 | Logs em produção                                            | Sem token, link, e-mail aberto ou marcador de desenvolvimento | Todos os critérios atendidos              | Aprovado  |
+| TC-033 | Logs em homologação                                         | Mesma proteção do ambiente de produção                        | Todos os critérios atendidos              | Aprovado  |
+| TC-034 | Logs em ambiente identificado como produção                 | Mesma proteção do ambiente de produção                        | Todos os critérios atendidos              | Aprovado  |
+| TC-035 | Envio bem-sucedido pelo servidor de e-mail                  | Log marca entrega real, sem token nem e-mail abertos          | Critérios atendidos com servidor simulado | Aprovado  |
+| TC-036 | Log em ambiente de desenvolvimento                          | Inclui o link de verificação e o endereço base                | Token e endereço presentes                | Aprovado  |
+| TC-037 | Marcador de desenvolvimento nos logs locais                 | Marcador visível na mensagem                                  | Marcador presente                         | Aprovado  |
+| TC-038 | Limpeza de marcadores entre colchetes em mensagem normal    | Colchetes removidos e texto principal mantido                 | Marcadores removidos                      | Aprovado  |
+| TC-039 | Limpeza em texto sem marcadores                             | Texto retornado igual ao original                             | Texto inalterado                          | Aprovado  |
+| TC-040 | Limpeza de marcador no começo da mensagem                   | Marcador removido e espaços ajustados                         | Resultado correto                         | Aprovado  |
+| TC-041 | Limpeza de vários marcadores na mesma mensagem              | Todos os marcadores removidos, com texto residual preservado  | Resultado correto                         | Aprovado  |
+| TC-042 | Limpeza com texto vazio                                     | Mensagem padrão segura no lugar                               | Mensagem padrão retornada                 | Aprovado  |
+| TC-043 | Política de referência em resposta de verificação de e-mail | Cabeçalhos de proteção presentes mesmo em resposta de erro    | Cabeçalhos presentes                      | Aprovado  |
+| TC-044 | Política de referência em rota de reenvio de verificação    | Cabeçalho de política presente                                | Cabeçalho presente                        | Aprovado  |
 
 ---
 
@@ -279,37 +284,37 @@ A tabela a seguir registra o resultado individual de cada caso de teste na execu
 
 ### 8.1 Resumo de Execução
 
-| Métrica                    | Valor |
-| -------------------------- | ----- |
-| Total de casos de teste    | 44    |
-| Aprovados                  | 44    |
-| Reprovados                 | 0     |
-| Não executados             | 0     |
-| Taxa de aprovação          | 100%  |
-| Warnings emitidos          | ~54 (`DeprecationWarning: datetime.utcnow()`) |
-| Erros de execução          | 0     |
+| Métrica                 | Valor                                        |
+| ----------------------- | -------------------------------------------- |
+| Total de casos de teste | 44                                           |
+| Aprovados               | 44                                           |
+| Reprovados              | 0                                            |
+| Não executados          | 0                                            |
+| Taxa de aprovação       | 100%                                         |
+| Avisos emitidos         | ~54 (aviso de depreciação de função de data) |
+| Erros de execução       | 0                                            |
 
 ### 8.2 Cobertura por Módulo
 
-| Módulo                            | Casos | Aprovados | Reprovados |
-| --------------------------------- | ----- | --------- | ---------- |
-| Versionamento de API              | 4     | 4         | 0          |
-| Verificação de E-mail             | 9     | 9         | 0          |
-| Cotas, Favoritos e Histórico      | 12    | 12        | 0          |
-| Exclusão de Conta (LGPD)          | 4     | 4         | 0          |
-| Headers de Segurança Globais      | 2     | 2         | 0          |
-| Hardenings de Segurança e Logs    | 13    | 13        | 0          |
-| **Total**                         | **44**| **44**    | **0**      |
+| Módulo                          | Casos  | Aprovados | Reprovados |
+| ------------------------------- | ------ | --------- | ---------- |
+| Versionamento de API            | 4      | 4         | 0          |
+| Verificação de E-mail           | 9      | 9         | 0          |
+| Cotas, Favoritos e Histórico    | 12     | 12        | 0          |
+| Exclusão de Conta (LGPD)        | 4      | 4         | 0          |
+| Cabeçalhos de Segurança Globais | 2      | 2         | 0          |
+| Proteções de Segurança e Logs   | 13     | 13        | 0          |
+| **Total**                       | **44** | **44**    | **0**      |
 
 ### 8.3 Artefatos Gerados
 
-| Artefato                         | Localização                              |
-| -------------------------------- | ---------------------------------------- |
-| Plano de Teste                   | `docs/PLANO_DE_TESTE.md`                 |
-| Este relatório                   | `docs/IMPLEMENTACAO_EXECUCAO_TESTES.md`  |
-| Suite de testes automatizados    | `tests/`                                 |
-| Banco em memória                 | `tests/fake_db.py`                       |
-| Fixtures e configuração          | `tests/conftest.py`                      |
+| Artefato                              | Localização                             |
+| ------------------------------------- | --------------------------------------- |
+| Plano de Teste                        | `docs/PLANO_DE_TESTE.md`                |
+| Este relatório                        | `docs/IMPLEMENTACAO_EXECUCAO_TESTES.md` |
+| Suíte de testes automatizados         | `tests/`                                |
+| Banco de dados simulado em memória    | `tests/fake_db.py`                      |
+| Configuração compartilhada dos testes | `tests/conftest.py`                     |
 
 ---
 
@@ -317,27 +322,29 @@ A tabela a seguir registra o resultado individual de cada caso de teste na execu
 
 ### 9.1 Análise dos Resultados
 
-A suite de testes automatizados do PrevIsmob atingiu **100% de aprovação** em todos os 44 casos de teste executados, cobrindo os módulos mais críticos do sistema: autenticação, verificação de e-mail, cotas, exclusão de conta (LGPD) e segurança (headers HTTP e sanitização de logs). A infraestrutura de testes com `FakeDB` e `monkeypatch` possibilitou execução completamente offline, sem dependências de MySQL, SMTP, Google Maps API ou Google OAuth.
+A suíte de testes do PrevIsmob atingiu 100% de aprovação. Todos os 44 casos passaram. A cobertura inclui os módulos mais sensíveis do sistema: autenticação, verificação de e-mail, cotas, exclusão de conta pela LGPD e segurança (cabeçalhos e limpeza de logs).
 
-### 9.2 Gaps Identificados
+O uso do banco de dados simulado em memória e da substituição de componentes reais por simulados permitiu rodar todos os testes sem internet. Nenhuma chamada real foi feita ao MySQL, ao servidor de e-mail, ao Google Maps ou ao login do Google.
 
-| Gap                                                | Impacto  | Ação Recomendada                                                      |
-| -------------------------------------------------- | -------- | --------------------------------------------------------------------- |
-| Fluxo feliz de previsão (`/v1/prever`) não testado | Médio    | Implementar mock de Google Maps e estimador para cobrir fluxo completo. |
-| Login social Google OAuth não automatizado         | Médio    | Implementar stub de `google.oauth2.id_token.verify_oauth2_token`.     |
-| Conteúdo de CSV e PDF não validado                 | Baixo    | Adicionar teste de snapshot para formato do arquivo.                   |
-| Rotação de refresh token não testada               | Médio    | Implementar caso de teste para `POST /v1/auth/refresh`.               |
-| Banco MySQL real não exercitado                    | Alto     | Incluir teste de integração com banco real em ambiente de CI (pipeline separado). |
-| `datetime.utcnow()` deprecado (~54 warnings)       | Baixo    | Migrar para `datetime.now(timezone.utc)` conforme roadmap.            |
+### 9.2 Pontos a Melhorar
+
+| Ponto                                                         | Impacto | Ação Recomendada                                                            |
+| ------------------------------------------------------------- | ------- | --------------------------------------------------------------------------- |
+| Fluxo completo de previsão ainda não testado de ponta a ponta | Médio   | Criar simulação do Google Maps e do estimador para cobrir o fluxo completo. |
+| Login com Google ainda não automatizado                       | Médio   | Criar simulação da função de verificação do token do Google.                |
+| Conteúdo dos arquivos exportados ainda não validado           | Baixo   | Adicionar teste comparando o conteúdo do arquivo gerado com um modelo.      |
+| Troca do token de atualização ainda não testada               | Médio   | Implementar caso de teste para a rota de atualização de token.              |
+| Banco MySQL real ainda não exercitado nos testes              | Alto    | Incluir teste de integração com banco real em ambiente de CI.               |
+| Aviso de depreciação de função de data                        | Baixo   | Migrar para a forma atual com fuso horário, conforme roadmap.               |
 
 ### 9.3 Próximos Passos
 
-1. Implementar testes automatizados para o fluxo completo de previsão com mocks de Google Maps.
-2. Adicionar caso de teste para `POST /v1/auth/google` com stub da biblioteca `google-auth`.
-3. Configurar pipeline CI (GitHub Actions) para executar `pytest -q` automaticamente em cada pull request.
-4. Migrar `datetime.utcnow()` para `datetime.now(timezone.utc)` como item de roadmap técnico.
-5. Avaliar integração com banco MySQL real em ambiente de teste separado para cobrir o gap de schema.
+1. Implementar testes para o fluxo completo de previsão com simulação do Google Maps.
+2. Adicionar caso de teste para login com Google usando uma simulação da biblioteca oficial.
+3. Configurar a esteira de CI no GitHub Actions para rodar a suíte de testes em todo pull request.
+4. Migrar a função antiga de data para a versão atual com fuso horário, como item técnico do roadmap.
+5. Avaliar um ambiente de teste separado com MySQL real para fechar a lacuna de validação de esquema.
 
 ---
 
-*Documento elaborado em conformidade com as diretrizes IEEE 829-2008 (Standard for Software and System Test Documentation) e as práticas recomendadas pelo ISTQB Foundation Level Syllabus.*
+_Documento elaborado em conformidade com as diretrizes IEEE 829-2008 (Standard for Software and System Test Documentation) e as práticas recomendadas pelo ISTQB Foundation Level Syllabus._
