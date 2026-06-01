@@ -45,16 +45,17 @@ Casos de uso típicos:
 
 ## Funcionalidades principais
 
-- **Previsão de preço** por endereço/condomínio em Águas Claras (DF).
+- **Previsão de preço** por endereço/condomínio em Águas Claras (DF) — página dedicada `/previsao`.
 - **Modo guest** (sem login) com cota diária reduzida.
 - **Cadastro + login** com verificação obrigatória de e-mail (JWT access + refresh).
-- **Histórico inline** das avaliações do usuário autenticado, exibido na página `app` (não na landing).
+- **Login social com Google OAuth 2.0** (Google Identity Services; verificação do ID Token server-side).
+- **Histórico** de avaliações em página dedicada `/historico`.
 - **Favoritos** sobre avaliações do histórico.
-- **Comparar** múltiplas avaliações do histórico lado a lado.
-- **Exportação** de histórico em **CSV** e **PDF**.
+- **Comparar** 2 avaliações selecionadas no histórico lado a lado — página dedicada `/comparar` com gráfico radar.
+- **Exportação** de histórico em **CSV** e **PDF** (disponível em `/comparar`, suporta `?ids=ID1,ID2`).
 - **Cotas diárias** com feedback amigável (HTTP 429 + `Retry-After`).
-- **Exclusão de conta self-service** via `DELETE /auth/me` (anonimização + revogação de sessões — LGPD).
-- **API versionada**: caminho canônico `/v1/...` com header `X-API-Version: v1`; rotas legadas mantidas como alias durante a janela de coexistência (ver [Versionamento de API](README_ARQUITETURA.md#versionamento-de-api)).
+- **Exclusão de conta self-service** via `DELETE /v1/auth/me` (anonimização + revogação de sessões — LGPD).
+- **API versionada**: todos os endpoints vivem exclusivamente em `/v1/...`; toda resposta inclui o header `X-API-Version: v1`.
 - **Fluxo pós-login por intenção:** o destino após autenticar depende de onde o usuário clicou (landing logada vs. página de previsão — ver [arquitetura](README_ARQUITETURA.md#fluxos-de-navegação-e-estado)).
 
 ---
@@ -63,11 +64,12 @@ Casos de uso típicos:
 
 ```
 [Browser]
-  index.html + script.js + style.css
+  index.html (landing + auth)  ·  previsao.html  ·  historico.html  ·  comparar.html
+  script.js (auth/nav) + style.css
         │   (fetch JSON / cookies httpOnly)
         ▼
 [Backend FastAPI — api.py]
-  ├── Auth (JWT + bcrypt + verificação de e-mail)
+  ├── Auth (JWT + bcrypt + Google OAuth + verificação de e-mail)
   ├── Cotas (guest 2/dia, auth 10/dia)
   ├── Google Maps (geocoding + Places)
   ├── Modelo ML (joblib → modelo_imoveis.pkl)
@@ -113,25 +115,17 @@ As migrações em `migrations/*.sql` também são aplicadas de forma idempotente
 mysql -u <user> -p <db> < migrations/2026_04_23_email_verificacao.sql
 mysql -u <user> -p <db> < migrations/2026_04_23_unique_verif_hash.sql
 mysql -u <user> -p <db> < migrations/2026_04_25_quotas_favoritos.sql
+mysql -u <user> -p <db> < migrations/2026_05_google_oauth.sql
 ```
 
 ### 4. Subir backend
 
 ```powershell
-python api.py
+uvicorn api:app --reload
 # API em http://localhost:8000
 # Swagger em http://localhost:8000/docs
+# Frontend em http://localhost:8000 (servido pelo próprio backend)
 ```
-
-### 5. Servir frontend
-
-```powershell
-# Em outro terminal
-python -m http.server 8001
-# Acesse http://localhost:8001
-```
-
-> Abrir `index.html` direto via `file://` funciona para inspeção visual, mas pode quebrar cookies/CORS — prefira o servidor estático.
 
 ---
 
@@ -142,6 +136,7 @@ Crie `.env` na raiz. Nunca commite segredos.
 | Variável                                                  | Obrigatória           | Descrição                                                                           |
 | --------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------- |
 | `GOOGLE_MAPS_API_KEY` (ou `Maps_API_KEY`)                 | Sim                   | Chave da Google Maps API.                                                           |
+| `GOOGLE_CLIENT_ID`                                        | Sim p/ Google OAuth   | Client ID do projeto Google Cloud (OAuth 2.0).                                      |
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Sim p/ auth/histórico | Conexão MySQL. Sem essas variáveis a API sobe, mas rotas de banco ficam degradadas. |
 | `JWT_SECRET_KEY`                                          | Sim em produção       | Segredo HS256. Em dev usa fallback inseguro com warning.                            |
 | `JWT_ALGORITHM`                                           | Não                   | Default `HS256`.                                                                    |
@@ -153,7 +148,7 @@ Crie `.env` na raiz. Nunca commite segredos.
 | `EMAIL_VERIFY_RESEND_COOLDOWN_MIN`                        | Não                   | Default `2`.                                                                        |
 | `SMTP_DEV_MODE`                                           | Não                   | `1` para logar link de verificação no console (sem SMTP real).                      |
 | `APP_BASE_URL`                                            | Sim p/ e-mail         | Base usada no link de verificação.                                                  |
-| `CORS_ORIGINS`                                            | Não                   | Lista separada por vírgula. Default já cobre `localhost:3000/5173/5500/8001`.       |
+| `CORS_ORIGINS`                                            | Não                   | Lista separada por vírgula. Default já cobre `localhost:3000/5173/5500`.            |
 
 > Variáveis SMTP adicionais (host, porta, usuário, senha, remetente) são esperadas se `SMTP_DEV_MODE` não estiver ativo — verifique `email_service.py` para a lista exata em uso.
 
@@ -163,19 +158,19 @@ Crie `.env` na raiz. Nunca commite segredos.
 
 ### Como **guest** (sem login)
 
-1. Abrir `http://localhost:8001` → landing.
-2. Clicar em **Avaliar Imóvel**.
+1. Abrir `http://localhost:8000` → landing.
+2. Clicar em **Avaliar Imóvel** → navega para `/previsao`.
 3. Preencher formulário → receber previsão.
 4. Repetir até atingir **2 previsões/dia** (cota guest).
 5. Após o limite, a UI sugere criar conta para liberar mais.
 
 ### Como **usuário autenticado**
 
-1. **Criar conta** → e-mail de verificação (em dev, link aparece no terminal do backend).
+1. **Criar conta** ou **Entrar com Google** → e-mail de verificação (em dev, link aparece no terminal do backend; fluxo Google dispensa verificação).
 2. Clicar no link de verificação → conta ativada.
 3. **Login** → cota sobe para **10/dia**.
-4. Usar o app normalmente; cada previsão alimenta o **histórico inline** (visível apenas na página `app`).
-5. Marcar favoritos, comparar, exportar **CSV/PDF**.
+4. Fazer previsões em `/previsao`; histórico acessível em `/historico`.
+5. Marcar favoritos, comparar em `/comparar`, exportar **CSV/PDF**.
 6. **Logout** volta para landing pública.
 
 ---
@@ -234,3 +229,4 @@ A definir.
 
 - [README_ARQUITETURA.md](README_ARQUITETURA.md) — arquitetura, fluxos e decisões técnicas.
 - [README_TESTES.md](README_TESTES.md) — estratégia, comandos e checklist de testes.
+- [CONTRIBUICOES.md](CONTRIBUICOES.md) — divisão de responsabilidades dos integrantes.

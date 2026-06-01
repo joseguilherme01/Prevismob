@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Comparar Imóveis · PrevIsmob</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="pg-shell">
+    <!-- ── Tela de transição / loading ────────────────────────────────── -->
+    <div
+      class="comp-loading"
+      id="comp-loading"
+      aria-live="polite"
+      aria-label="Carregando comparação"
+    >
+      <div class="comp-loading__title">Comparando imóveis</div>
+      <div class="comp-ellipsis" aria-hidden="true">
+        <div class="comp-ellipsis__dot"></div>
+        <div class="comp-ellipsis__dot"></div>
+        <div class="comp-ellipsis__dot"></div>
+      </div>
+      <div class="comp-loading__sub">Buscando avaliações…</div>
+    </div>
+
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <header class="pg-header">
+      <div
+        class="pg-header__brand"
+        style="cursor: pointer"
+        onclick="window.location.href='/'"
+      >
+        <span class="nav__logo-icon" aria-hidden="true">◈</span>
+        <span>PrevIsmob</span>
+      </div>
+      <a
+        href="#"
+        onclick="event.preventDefault(); window.history.back();"
+        style="
+          cursor: pointer;
+          text-decoration: none;
+          color: var(--c-gray-500, #64748b);
+          font-size: var(--text-sm);
+        "
+        >← Histórico</a
+      >
+      <h1 class="pg-header__title">Comparação</h1>
+      <div class="pg-header__actions">
+        <button class="btn btn--outline btn--sm" id="btn-exp-csv">CSV</button>
+        <button class="btn btn--outline btn--sm" id="btn-exp-pdf">PDF</button>
+      </div>
+      <div
+        class="dash-user"
+        id="dashUser"
+        style="display: none; position: relative; cursor: pointer"
+        title=""
+      >
+        <span class="dash-user__avatar" aria-hidden="true">👤</span>
+        <span class="dash-user__info">
+          <strong id="dashUserNome">—</strong>
+          <small id="dashUserEmail">—</small>
+        </span>
+        <div
+          class="dash-user__menu"
+          id="dashUserMenu"
+          hidden
+          style="
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            z-index: 900;
+            background: var(--c-white);
+            border: 1px solid var(--c-gray-200);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            padding: var(--sp-2);
+            min-width: 120px;
+          "
+        >
+          <button
+            class="btn btn--outline btn--sm btn--full"
+            id="btn-logout"
+            type="button"
+          >
+            Sair
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Conteúdo principal ─────────────────────────────────────────── -->
+    <main class="pg-main" id="cmp-main" hidden>
+      <!-- Tabela de comparação -->
+      <div class="cmp-table" id="cmp-table">
+        <!-- Linha de cabeçalho -->
+        <div class="cmp-table__cell cmp-head cmp-head--label">Imóvel</div>
+        <div class="cmp-table__cell cmp-head" id="cmp-name-a">—</div>
+        <div class="cmp-table__cell cmp-head" id="cmp-name-b">—</div>
+        <!-- Linhas de métricas preenchidas via JS -->
+      </div>
+
+      <!-- Gráfico radar -->
+      <section class="cmp-radar-section">
+        <p class="cmp-radar-title">Visão geral comparativa</p>
+        <div class="cmp-radar-wrap">
+          <canvas
+            id="cmp-radar-chart"
+            aria-label="Gráfico radar de comparação entre os dois imóveis"
+          ></canvas>
+        </div>
+      </section>
+    </main>
+
+    <!-- Mensagem de erro -->
+    <div id="cmp-error" hidden class="cmp-error-state">
+      <p id="cmp-error-msg">Não foi possível carregar a comparação.</p>
+      <a href="/historico" class="btn btn--outline">Voltar ao histórico</a>
+    </div>
+
+    <script src="config.js"></script>
+    <!-- Chart.js para o radar -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+      "use strict";
+
+      /* ── Config ───────────────────────────────────────────────────────── */
+      const _API =
+        (window.PREVISMOB_CONFIG && window.PREVISMOB_CONFIG.API_BASE) ||
+        `${location.protocol}//${location.hostname}:8000`;
+
+      /* ── Utilitários de auth (inline) ─────────────────────────────────── */
+      const _getAt = () => localStorage.getItem("prevismob_access_token");
+      const _getRt = () => localStorage.getItem("prevismob_refresh_token");
+
+      function _limpar() {
+        [
+          "prevismob_access_token",
+          "prevismob_refresh_token",
+          "prevismob_user",
+        ].forEach((k) => localStorage.removeItem(k));
+      }
+
+      async function _renovar() {
+        const rt = _getRt();
+        if (!rt) return false;
+        try {
+          const r = await fetch(`${_API}/v1/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: rt }),
+          });
+          if (!r.ok) {
+            _limpar();
+            return false;
+          }
+          const d = await r.json();
+          if (d.access_token)
+            localStorage.setItem("prevismob_access_token", d.access_token);
+          if (d.refresh_token)
+            localStorage.setItem("prevismob_refresh_token", d.refresh_token);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      async function _authFetch(url, opts = {}, retry = true) {
+        const token = _getAt();
+        const headers = { ...(opts.headers || {}) };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        let r = await fetch(url, { ...opts, headers });
+        if (r.status === 401 && retry) {
+          const ok = await _renovar();
+          if (ok) return _authFetch(url, opts, false);
+          _limpar();
+          location.href = "/";
+          return r;
+        }
+        return r;
+      }
+
+      /* ── Formatação ───────────────────────────────────────────────────── */
+      const _br = (n) =>
+        n == null
+          ? "—"
+          : Number(n).toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+      const _esc = (s) =>
+        String(s || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+
+      /* ── Métricas a exibir ────────────────────────────────────────────── */
+      const METRICS = [
+        { section: "Características", key: null },
+        {
+          key: "area_util_m2",
+          label: "Área útil",
+          fmt: (v) => `${Number(v).toFixed(0)} m²`,
+          higher: true,
+        },
+        {
+          key: "quartos",
+          label: "Quartos",
+          fmt: (v) => String(v),
+          higher: true,
+        },
+        { key: "vagas", label: "Vagas", fmt: (v) => String(v), higher: true },
+        {
+          key: "valor_condominio_rs",
+          label: "Condomínio",
+          fmt: (v) => `R$ ${_br(v)}`,
+          higher: false,
+        },
+        { section: "Preços estimados", key: null },
+        {
+          key: "preco_m2_minimo",
+          label: "R$/m² mínimo",
+          fmt: (v) => `R$ ${_br(v)}`,
+          higher: false,
+        },
+        {
+          key: "preco_m2_sugerido",
+          label: "R$/m² sugerido",
+          fmt: (v) => `R$ ${_br(v)}`,
+          higher: false,
+        },
+        {
+          key: "preco_m2_maximo",
+          label: "R$/m² máximo",
+          fmt: (v) => `R$ ${_br(v)}`,
+          higher: false,
+        },
+        { section: "Total estimado", key: null },
+        {
+          key: "preco_total_minimo_rs",
+          label: "Total mínimo",
+          fmt: (v) => `R$ ${_br(v)}`,
+          higher: false,
+        },
+        {
+          key: "preco_total_sugerido_rs",
+          label: "Total sugerido",
+          fmt: (v) => `R$ ${_br(v)}`,
+          higher: false,
+        },
+        {
+          key: "preco_total_maximo_rs",
+          label: "Total máximo",
+          fmt: (v) => `R$ ${_br(v)}`,
+          higher: false,
+        },
+      ];
+
+      /* ── Renderização da tabela ───────────────────────────────────────── */
+      function _renderTabela(a, b) {
+        const table = document.getElementById("cmp-table");
+
+        // Nome dos imóveis
+        document.getElementById("cmp-name-a").textContent =
+          a.nome_predio || "Imóvel A";
+        document.getElementById("cmp-name-b").textContent =
+          b.nome_predio || "Imóvel B";
+
+        METRICS.forEach((m) => {
+          if (m.section !== undefined && m.key === null) {
+            // Linha separadora de seção (ocupa as 3 colunas)
+            const s = document.createElement("div");
+            s.className = "cmp-table__cell cmp-section";
+            s.textContent = m.section;
+            const s2 = s.cloneNode(true);
+            const s3 = s.cloneNode(true);
+            table.appendChild(s);
+            table.appendChild(s2);
+            table.appendChild(s3);
+            return;
+          }
+
+          const va = a[m.key];
+          const vb = b[m.key];
+          let winA = false,
+            winB = false;
+
+          if (va != null && vb != null && va !== vb) {
+            winA = m.higher ? va > vb : va < vb;
+            winB = !winA;
+          }
+
+          const cellLabel = document.createElement("div");
+          cellLabel.className = "cmp-table__cell cmp-label";
+          cellLabel.textContent = m.label;
+
+          const cellA = document.createElement("div");
+          cellA.className =
+            "cmp-table__cell cmp-val" +
+            (winA ? " is-winner" : winB ? " is-loser" : "");
+          cellA.textContent = va != null ? m.fmt(va) : "—";
+
+          const cellB = document.createElement("div");
+          cellB.className =
+            "cmp-table__cell cmp-val" +
+            (winB ? " is-winner" : winA ? " is-loser" : "");
+          cellB.textContent = vb != null ? m.fmt(vb) : "—";
+
+          table.appendChild(cellLabel);
+          table.appendChild(cellA);
+          table.appendChild(cellB);
+        });
+      }
+
+      /* ── Gráfico radar ────────────────────────────────────────────────── */
+      function _renderRadar(a, b) {
+        // 5 dimensões — invert=true significa "menor = melhor", inverte para o radar
+        const dims = [
+          {
+            label: "Área",
+            va: a.area_util_m2,
+            vb: b.area_util_m2,
+            invert: false,
+          },
+          { label: "Quartos", va: a.quartos, vb: b.quartos, invert: false },
+          { label: "Vagas", va: a.vagas, vb: b.vagas, invert: false },
+          {
+            label: "Preço/m²",
+            va: a.preco_m2_sugerido,
+            vb: b.preco_m2_sugerido,
+            invert: true,
+          },
+          {
+            label: "Condomínio",
+            va: a.valor_condominio_rs,
+            vb: b.valor_condominio_rs,
+            invert: true,
+          },
+        ];
+
+        const dataA = [],
+          dataB = [];
+        dims.forEach((d) => {
+          const va = d.va || 0.0001;
+          const vb = d.vb || 0.0001;
+          let sA, sB;
+          if (d.invert) {
+            // menor valor → pontuação mais alta (melhor custo)
+            const maxInv = Math.max(1 / va, 1 / vb);
+            sA = (1 / va / maxInv) * 100;
+            sB = (1 / vb / maxInv) * 100;
+          } else {
+            const mx = Math.max(va, vb);
+            sA = (va / mx) * 100;
+            sB = (vb / mx) * 100;
+          }
+          // Se iguais, centraliza em 75 para evitar gráfico colapsado
+          if (Math.abs(sA - sB) < 0.01) {
+            sA = sB = 75;
+          }
+          dataA.push(Math.round(sA));
+          dataB.push(Math.round(sB));
+        });
+
+        const ctx = document.getElementById("cmp-radar-chart").getContext("2d");
+        new Chart(ctx, {
+          type: "radar",
+          data: {
+            labels: dims.map((d) => d.label),
+            datasets: [
+              {
+                label: a.nome_predio || "Imóvel A",
+                data: dataA,
+                backgroundColor: "rgba(45, 125, 210, 0.18)",
+                borderColor: "rgba(45, 125, 210, 0.85)",
+                pointBackgroundColor: "rgba(45, 125, 210, 1)",
+                pointRadius: 4,
+              },
+              {
+                label: b.nome_predio || "Imóvel B",
+                data: dataB,
+                backgroundColor: "rgba(34, 197, 94, 0.12)",
+                borderColor: "rgba(34, 197, 94, 0.8)",
+                pointBackgroundColor: "rgba(34, 197, 94, 1)",
+                pointRadius: 4,
+                borderDash: [5, 4],
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            scales: {
+              r: {
+                min: 0,
+                max: 100,
+                ticks: { display: false, stepSize: 25 },
+                grid: { color: "rgba(0,0,0,0.08)" },
+                angleLines: { color: "rgba(0,0,0,0.08)" },
+                pointLabels: {
+                  color: "#475569",
+                  font: { size: 12, family: "Inter, sans-serif" },
+                },
+              },
+            },
+            plugins: {
+              legend: {
+                labels: {
+                  color: "#1e293b",
+                  font: { size: 12, family: "Inter, sans-serif" },
+                  usePointStyle: true,
+                  pointStyle: "circle",
+                },
+              },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => `${ctx.dataset.label}: ${ctx.raw}%`,
+                },
+              },
+            },
+          },
+        });
+      }
+
+      /* ── Renderização completa ────────────────────────────────────────── */
+      function _renderComparacao(data) {
+        const items = data.items || [];
+
+        if (items.length < 2) {
+          _showError(
+            "São necessários pelo menos 2 imóveis para comparar. " +
+              "Selecione 2 avaliações no histórico.",
+          );
+          return;
+        }
+
+        const [a, b] = items;
+        _renderTabela(a, b);
+        _renderRadar(a, b);
+
+        document.getElementById("cmp-main").hidden = false;
+        // Anima saída da tela de loading
+        document.getElementById("comp-loading").classList.add("is-done");
+      }
+
+      /* ── Erro ─────────────────────────────────────────────────────────── */
+      function _showError(msg) {
+        document.getElementById("comp-loading").classList.add("is-done");
+        const el = document.getElementById("cmp-error");
+        el.hidden = false;
+        el.style.display = "flex";
+        if (msg) document.getElementById("cmp-error-msg").textContent = msg;
+      }
+
+      /* ── Export ───────────────────────────────────────────────────────── */
+      async function _exportar(tipo, ids) {
+        const url = `${_API}/v1/export/${tipo}?ids=${encodeURIComponent(ids)}`;
+        const r = await _authFetch(url);
+        if (!r.ok) {
+          alert("Erro ao exportar. Tente novamente.");
+          return;
+        }
+        const blob = await r.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `prevismob_comparacao.${tipo}`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }
+
+      /* ── Auth guard ───────────────────────────────────────────────────── */
+      async function _checkAuth() {
+        if (!_getAt()) {
+          location.href = "/";
+          return;
+        }
+        const r = await _authFetch(`${_API}/v1/auth/me`);
+        if (!r.ok) {
+          _limpar();
+          location.href = "/";
+          return;
+        }
+        try {
+          const d = await r.json();
+          _preencherUsuario(d.usuario || null);
+        } catch (_) {}
+      }
+
+      /* ── Card de usuário (header) ─────────────────────────────────────── */
+      function _preencherUsuario(usuario) {
+        const box = document.getElementById("dashUser");
+        const nomeEl = document.getElementById("dashUserNome");
+        const emailEl = document.getElementById("dashUserEmail");
+        if (!box || !nomeEl || !emailEl) return;
+        if (usuario && usuario.email) {
+          nomeEl.textContent = usuario.nome || "Usuário";
+          emailEl.textContent = usuario.email;
+          box.title = `${usuario.nome || ""} — ${usuario.email}`;
+          box.style.display = "inline-flex";
+        } else {
+          box.style.display = "none";
+        }
+      }
+
+      /* ── Card de usuário — interação ──────────────────────────────────── */
+      function _initUserCard() {
+        const userBox = document.getElementById("dashUser");
+        const userMenu = document.getElementById("dashUserMenu");
+        if (userBox && userMenu) {
+          userBox.addEventListener("click", (e) => {
+            if (e.target.closest("#dashUserMenu")) return;
+            userMenu.hidden = !userMenu.hidden;
+          });
+          document.addEventListener("click", (e) => {
+            if (!userBox.contains(e.target)) userMenu.hidden = true;
+          });
+        }
+        const btnLogout = document.getElementById("btn-logout");
+        if (btnLogout) {
+          btnLogout.addEventListener("click", () => {
+            localStorage.removeItem("prevismob_access_token");
+            localStorage.removeItem("prevismob_refresh_token");
+            window.location.href = "/";
+          });
+        }
+      }
+
+      /* ── Bootstrap ────────────────────────────────────────────────────── */
+      document.addEventListener("DOMContentLoaded", async () => {
+        const params = new URLSearchParams(location.search);
+        const ids = params.get("ids");
+
+        if (!ids) {
+          location.href = "/historico";
+          return;
+        }
+
+        await _checkAuth();
+        _initUserCard();
+
+        let data = null;
+        try {
+          const r = await _authFetch(
+            `${_API}/v1/comparar?ids=${encodeURIComponent(ids)}`,
+          );
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            _showError(err.detail || "Erro ao carregar as avaliações.");
+            return;
+          }
+          data = await r.json();
+        } catch {
+          _showError(
+            "Falha de conexão. Verifique sua internet e tente novamente.",
+          );
+          return;
+        }
+
+        _renderComparacao(data);
+
+        document
+          .getElementById("btn-exp-csv")
+          .addEventListener("click", () => _exportar("csv", ids));
+        document
+          .getElementById("btn-exp-pdf")
+          .addEventListener("click", () => _exportar("pdf", ids));
+      });
+    </script>
+  </body>
+</html>

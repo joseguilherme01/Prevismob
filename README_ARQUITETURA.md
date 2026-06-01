@@ -11,7 +11,9 @@ Documento técnico sobre a estrutura interna do PrevIsmob, fluxos de navegação
 - [Estrutura de pastas](#estrutura-de-pastas)
 - [Fluxos de navegação e estado](#fluxos-de-navegação-e-estado)
 - [Fluxo de quota](#fluxo-de-quota)
-- [Histórico inline (app)](#histórico-inline-app)
+- [Google OAuth 2.0](#google-oauth-20)
+- [Histórico e comparação](#histórico-e-comparação)
+- [Comportamento com falhas de serviços externos](#comportamento-com-falhas-de-serviços-externos)
 - [Endpoints principais](#endpoints-principais)
 - [Modelo de dados](#modelo-de-dados)
 - [Versionamento de API](#versionamento-de-api)
@@ -36,26 +38,29 @@ Documento técnico sobre a estrutura interna do PrevIsmob, fluxos de navegação
 ```
 ┌────────────────────────────── Frontend (estático) ──────────────────────────────┐
 │                                                                                 │
-│   index.html  ─►  #landing-section   (público; sem histórico inline)            │
-│                ─►  #app-section       (formulário + resultado + histórico)      │
-│   script.js   ─►  estado client-side (auth, cota, intent pós-login)             │
-│   style.css   ─►  tema único, mobile-first                                      │
+│   index.html    ─►  landing + auth (login, cadastro, Google OAuth)              │
+│   previsao.html ─►  formulário de previsão + resultado                          │
+│   historico.html─►  histórico de avaliações + favoritos                         │
+│   comparar.html ─►  comparação lado a lado + exportação CSV/PDF                 │
+│   script.js     ─►  estado client-side compartilhado (auth, intent pós-login)   │
+│   style.css     ─►  tema único, mobile-first                                    │
 └────────────────────────────────────┬────────────────────────────────────────────┘
                                      │ fetch JSON + cookie httpOnly (guest_id)
                                      ▼
 ┌────────────────────────────── Backend FastAPI ──────────────────────────────────┐
 │   api.py                                                                        │
-│   ├── /auth/*           → registro, verificação, login, refresh, logout, me     │
-│   ├── /prever           → orquestra Maps + ML + persistência + cota             │
-│   ├── /quota            → estado atual da cota (guest/auth)                     │
-│   ├── /historico        → lista avaliações do usuário                           │
-│   ├── /favoritos/{id}   → toggle de favorito                                    │
-│   ├── /comparar         → múltiplas avaliações lado a lado                      │
-│   ├── /export/{csv,pdf} → exportação                                            │
-│   ├── /condominio       → autocomplete (CSV legado)                             │
-│   └── /, /status, /docs → metadados                                             │
+│   ├── /v1/auth/*           → registro, verificação, login, refresh, logout, me  │
+│   ├── /v1/auth/google      → login/cadastro via Google OAuth (ID Token)         │
+│   ├── /v1/prever           → orquestra Maps + ML + persistência + cota          │
+│   ├── /v1/quota            → estado atual da cota (guest/auth)                  │
+│   ├── /v1/historico        → lista avaliações do usuário                        │
+│   ├── /v1/favoritos/{id}   → toggle de favorito                                 │
+│   ├── /v1/comparar         → múltiplas avaliações lado a lado                   │
+│   ├── /v1/export/{csv,pdf} → exportação                                         │
+│   ├── /v1/condominio       → autocomplete (dataset CSV)                         │
+│   ├── /v1/status           → metadados / healthcheck                            │
+│   └── /, /previsao, /historico, /comparar, /docs → páginas HTML e Swagger      │
 │                                                                                 │
-│   db.py             → engine SQLAlchemy (MySQL)                                 │
 │   email_service.py  → tokens de verificação + envio (SMTP ou dev-mode)          │
 │   modelo_imoveis.pkl → estimador scikit-learn carregado via joblib              │
 └────────────────────────────────────┬────────────────────────────────────────────┘
@@ -76,13 +81,16 @@ Documento técnico sobre a estrutura interna do PrevIsmob, fluxos de navegação
 ```text
 Prevismob/
 ├── api.py                         # Backend FastAPI (rotas + regras de negócio)
-├── db.py                          # Engine SQLAlchemy básica (utilitário)
 ├── email_service.py               # Tokens + envio de e-mail de verificação
 ├── modelo_imoveis.pkl             # Modelo ML treinado (joblib)
 ├── treinar_ia.py                  # Script de treino offline
-├── index.html                     # SPA leve (landing + app numa mesma página)
-├── script.js                      # Estado client-side e integração com a API
-├── style.css                      # Tema visual
+├── static/
+│   ├── index.html                 # Landing + autenticação (Google OAuth incluso)
+│   ├── previsao.html              # Formulário de previsão e resultado
+│   ├── historico.html             # Histórico, favoritos e navegação
+│   ├── comparar.html              # Comparação lado a lado + exportação CSV/PDF
+│   ├── script.js                  # Estado client-side compartilhado
+│   └── style.css                  # Tema visual
 ├── requirements.txt               # Dependências de runtime da API
 ├── requirements-train.txt         # Dependências extras para treino/scripts
 ├── data/
@@ -97,20 +105,22 @@ Prevismob/
 
 ## Fluxos de navegação e estado
 
-### Landing vs. App
+### Páginas e rotas de frontend
 
-`index.html` contém duas regiões mutuamente exclusivas:
+O frontend é composto de **4 páginas HTML independentes**, servidas pelo próprio backend FastAPI via `FileResponse` e `StaticFiles`:
 
-- `#landing-section` — pública, sem histórico, sem dados sensíveis.
-- `#app-section` — página de previsão; aloja o formulário, o resultado e o **histórico inline** (apenas para usuários autenticados).
+- `index.html` — landing pública + autenticação (login, cadastro, Google OAuth).
+- `previsao.html` — formulário de previsão e resultado; aceita guest ou auth.
+- `historico.html` — histórico de avaliações, favoritos e links para comparação.
+- `comparar.html` — comparação lado a lado de 2 avaliações + exportação CSV/PDF.
 
-`script.js` alterna entre elas via `mostrarLanding()` / `mostrarApp()`. A landing é sempre o ponto de entrada padrão.
+`script.js` (compartilhado) gerencia apenas estado de auth e navegação na landing. Cada página tem seu próprio JS inline para operações de domínio. A landing (`/`) é sempre o ponto de entrada padrão.
 
 ### Guest vs. Auth
 
 | Estado | Identificação                                                          | Cota             | Recursos disponíveis                                   |
 | ------ | ---------------------------------------------------------------------- | ---------------- | ------------------------------------------------------ |
-| Guest  | Cookie `prevismob_guest_id` (UUID v4, httpOnly) ou fallback hash IP+UA | 2 previsões/dia  | `/prever`, `/quota`, `/condominio`                     |
+| Guest  | Cookie `prevismob_guest_id` (UUID v4, httpOnly) ou fallback hash IP+UA | 2 previsões/dia  | `/v1/prever`, `/v1/quota`, `/v1/condominio`            |
 | Auth   | JWT Bearer (access 15min) + refresh (7d, hash em `sessoes`)            | 10 previsões/dia | Tudo do guest + histórico, favoritos, comparar, export |
 
 A landing detecta o estado pela presença/validade do access token e ajusta a navbar (`data-auth-state="guest|auth"`).
@@ -120,9 +130,9 @@ A landing detecta o estado pela presença/validade do access token e ajusta a na
 Após login bem-sucedido, o frontend usa a variável `pendingPostLoginNext` para decidir o destino:
 
 - `next = "landing"` (default) — usuário fez login a partir da landing pública e volta para a **landing logada** (com nav atualizada). Comportamento esperado quando o login é casual e o usuário ainda não decidiu prever nada.
-- `next = "app"` — usuário acionou o login após tentar uma ação que exige autenticação (ex.: clicou em **Avaliar Imóvel** sem estar logado, ou recarregou a página enquanto estava no app). Após o login, o frontend leva-o direto para `#app-section`.
+- `next = "app"` — usuário acionou o login após tentar uma ação que exige autenticação (ex.: clicou em **Avaliar Imóvel** sem estar logado). Após o login, o frontend navega para `/previsao`.
 
-> Trecho de referência em [`script.js`](script.js#L242-L274). Tokens inválidos/expirados não derrubam a landing pública: `get_optional_user` no backend retorna `None` silenciosamente.
+> Trecho de referência em [`static/script.js`](static/script.js). Tokens inválidos/expirados não derrubam a landing pública: `get_optional_user` no backend retorna `None` silenciosamente.
 
 ---
 
@@ -142,40 +152,76 @@ Configurável via `DAILY_LIMIT_GUEST` e `DAILY_LIMIT_AUTH` no `.env`.
 
 ---
 
-## Histórico inline (app)
+## Google OAuth 2.0
 
-- Renderizado **apenas dentro de `#app-section`**. Em `#landing-section` a UI não monta o componente — é uma defesa em profundidade contra vazamento entre estados.
-- Endpoint backing: `GET /historico` (auth obrigatória).
+O login social usa **Google Identity Services** no frontend e verificação server-side do ID Token.
+
+### Fluxo
+
+1. Frontend renderiza o botão Google Sign-In (GIS SDK) na tela de login/cadastro.
+2. Usuário autoriza → GIS retorna um `credential` (ID Token JWT assinado pelo Google).
+3. Frontend envia `POST /v1/auth/google` com `{"id_token": "<credential>"}`.
+4. Backend valida o ID Token via `google-auth` (`google.oauth2.id_token.verify_oauth2_token`), usando `GOOGLE_CLIENT_ID` como audience.
+5. Se válido: cria usuário (se não existir) ou autentica usuário existente; retorna `access_token` e `refresh_token`.
+6. `senha_hash` fica `NULL` em usuários criados via OAuth — não possuem senha local.
+7. Conta OAuth é marcada como verificada automaticamente (sem etapa de e-mail).
+
+### Variáveis necessárias
+
+- `GOOGLE_CLIENT_ID` — Client ID do projeto no Google Cloud Console (OAuth 2.0 → Credentials).
+- Não requer `GOOGLE_CLIENT_SECRET` (fluxo é ID Token, não code exchange).
+
+---
+
+## Histórico e comparação
+
+- Histórico acessível via página dedicada `/historico` (auth obrigatória). A landing não exibe dados pessoais.
+- Endpoint backing: `GET /v1/historico`.
 - Cada item permite:
-  - Marcar/desmarcar favorito → `POST /favoritos/{avaliacao_id}` (toggle).
-  - Selecionar para comparação → `GET /comparar?ids=...`.
-  - Exportar a lista visível em CSV/PDF → `GET /export/csv` ou `/export/pdf`.
+  - Marcar/desmarcar favorito → `POST /v1/favoritos/{avaliacao_id}` (toggle).
+  - Selecionar para comparação → navega para `/comparar?ids=ID1,ID2`.
+  - Exportar a lista visível em CSV/PDF → `GET /v1/export/csv` ou `/v1/export/pdf`.
+
+---
+
+## Comportamento com falhas de serviços externos
+
+| Serviço      | Falha                                         | Resposta da API                                                                               |
+| ------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Google Maps  | Chave inválida, billing desabilitado, timeout | `502 Bad Gateway` com campo `detail` descrevendo a causa (`BILLING_DISABLED`, `INVALID_KEY`). |
+| MySQL        | Indisponível no boot ou na requisição         | `503 Service Unavailable`; a API sobe mas rotas que dependem de DB retornam 503.              |
+| Google OAuth | `GOOGLE_CLIENT_ID` ausente                    | `503 Service Unavailable`.                                                                    |
+| Google OAuth | ID Token inválido ou expirado                 | `401 Unauthorized`.                                                                           |
 
 ---
 
 ## Endpoints principais
 
-| Método   | Rota                         | Auth                       | Propósito                                                          |
-| -------- | ---------------------------- | -------------------------- | ------------------------------------------------------------------ |
-| `POST`   | `/auth/register`             | Pública                    | Cria usuário + envia e-mail de verificação.                        |
-| `GET`    | `/auth/verificar-email`      | Pública (token na query)   | Marca conta como verificada.                                       |
-| `POST`   | `/auth/reenviar-verificacao` | Pública                    | Reenvia link (cooldown configurável).                              |
-| `POST`   | `/auth/login`                | Pública                    | Retorna access + refresh; bloqueia se não verificado.              |
-| `POST`   | `/auth/refresh`              | Pública (com refresh)      | Rotaciona refresh + emite novo access.                             |
-| `POST`   | `/auth/logout`               | Pública (com refresh)      | Revoga sessão.                                                     |
-| `GET`    | `/auth/me`                   | Bearer                     | Dados do usuário corrente.                                         |
-| `DELETE` | `/auth/me`                   | Bearer                     | Exclusão (anonimização) da conta do usuário autenticado.           |
-| `GET`    | `/`                          | Pública                    | Metadados da API.                                                  |
-| `GET`    | `/status`                    | Pública                    | Indica se o modelo carregou.                                       |
-| `GET`    | `/condominio`                | Pública                    | Autocomplete de nomes (dataset CSV).                               |
-| `POST`   | `/prever`                    | Opcional (Bearer ou guest) | Previsão; consome cota; persiste em `avaliacoes` se DB disponível. |
-| `GET`    | `/quota`                     | Opcional                   | Estado da cota (auth ou guest).                                    |
-| `GET`    | `/historico`                 | Bearer                     | Avaliações do usuário corrente.                                    |
-| `POST`   | `/favoritos/{avaliacao_id}`  | Bearer                     | Toggle favorito.                                                   |
-| `GET`    | `/comparar`                  | Bearer                     | Compara avaliações por IDs.                                        |
-| `GET`    | `/export/csv`                | Bearer                     | Histórico em CSV.                                                  |
-| `GET`    | `/export/pdf`                | Bearer                     | Histórico em PDF.                                                  |
-| `GET`    | `/docs`                      | Pública                    | Swagger UI.                                                        |
+| Método   | Rota                            | Auth                       | Propósito                                                          |
+| -------- | ------------------------------- | -------------------------- | ------------------------------------------------------------------ |
+| `POST`   | `/v1/auth/register`             | Pública                    | Cria usuário + envia e-mail de verificação.                        |
+| `GET`    | `/v1/auth/verificar-email`      | Pública (token na query)   | Marca conta como verificada.                                       |
+| `POST`   | `/v1/auth/reenviar-verificacao` | Pública                    | Reenvia link (cooldown configurável).                              |
+| `POST`   | `/v1/auth/login`                | Pública                    | Retorna access + refresh; bloqueia se não verificado.              |
+| `POST`   | `/v1/auth/google`               | Pública                    | Login/cadastro via Google OAuth (ID Token server-side).            |
+| `POST`   | `/v1/auth/refresh`              | Pública (com refresh)      | Rotaciona refresh + emite novo access.                             |
+| `POST`   | `/v1/auth/logout`               | Pública (com refresh)      | Revoga sessão.                                                     |
+| `GET`    | `/v1/auth/me`                   | Bearer                     | Dados do usuário corrente.                                         |
+| `DELETE` | `/v1/auth/me`                   | Bearer                     | Exclusão (anonimização) da conta do usuário autenticado.           |
+| `GET`    | `/`                             | Pública                    | Landing (index.html).                                              |
+| `GET`    | `/previsao`                     | Pública                    | Página de previsão (previsao.html).                                |
+| `GET`    | `/historico`                    | Pública                    | Página de histórico (historico.html).                              |
+| `GET`    | `/comparar`                     | Pública                    | Página de comparação (comparar.html).                              |
+| `GET`    | `/docs`                         | Pública                    | Swagger UI.                                                        |
+| `GET`    | `/v1/status`                    | Pública                    | Indica se o modelo carregou.                                       |
+| `GET`    | `/v1/condominio`                | Pública                    | Autocomplete de nomes (dataset CSV).                               |
+| `POST`   | `/v1/prever`                    | Opcional (Bearer ou guest) | Previsão; consome cota; persiste em `avaliacoes` se DB disponível. |
+| `GET`    | `/v1/quota`                     | Opcional                   | Estado da cota (auth ou guest).                                    |
+| `GET`    | `/v1/historico`                 | Bearer                     | Avaliações do usuário corrente (JSON).                             |
+| `POST`   | `/v1/favoritos/{avaliacao_id}`  | Bearer                     | Toggle favorito.                                                   |
+| `GET`    | `/v1/comparar`                  | Bearer                     | Compara avaliações por IDs (JSON).                                 |
+| `GET`    | `/v1/export/csv`                | Bearer                     | Histórico em CSV.                                                  |
+| `GET`    | `/v1/export/pdf`                | Bearer                     | Histórico em PDF.                                                  |
 
 > A lista exata de parâmetros e schemas Pydantic está em `/docs` (gerado a partir do código). Quando houver dúvida, **verifique no código**: `api.py`.
 
@@ -204,7 +250,9 @@ erDiagram
     USUARIOS {
         bigint id_usuario PK
         varchar email UK
-        varchar senha_hash
+        varchar senha_hash "nullable (OAuth users)"
+        varchar google_id UK "nullable"
+        varchar avatar_url "nullable"
         tinyint plano_id FK
         enum papel
         tinyint ativo
@@ -272,7 +320,7 @@ erDiagram
 | Tabela                        | Finalidade                                                                                                                                                                                                                                                                                                                        |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `planos`                      | Catálogo de planos de uso. O campo `limite_previsoes_dia` parametriza a cota diária associada ao usuário e substitui valores hard-coded no backend.                                                                                                                                                                               |
-| `usuarios`                    | Identidade e credenciais. Centraliza autenticação (`senha_hash`), autorização (`papel`), estado de ativação (`ativo`), verificação de e-mail (`email_verificacao_token_hash`, `..._expira_em`) e telemetria de login.                                                                                                             |
+| `usuarios`                    | Identidade e credenciais. Centraliza autenticação local (`senha_hash`, nullable para contas OAuth) e social (`google_id`, `avatar_url`), autorização (`papel`), estado de ativação (`ativo`), verificação de e-mail (`email_verificacao_token_hash`, `..._expira_em`) e telemetria de login.                                      |
 | `sessoes`                     | Sessões de refresh token. Armazena apenas o **hash** do refresh token (`token_refresh_hash`), com janela de validade (`expira_em`) e marcação de revogação (`revogado_em`) para suportar logout e LGPD.                                                                                                                           |
 | `condominios`                 | Catálogo de empreendimentos avaliados. `chave_normalizada` (UNIQUE) viabiliza deduplicação determinística entre variações de digitação.                                                                                                                                                                                           |
 | `caracteristicas_localizacao` | Cache de enriquecimento geográfico (Google Maps) por condomínio. `fonte_dado` rastreia a procedência (`google`, `manual`, `importacao`) e `expira_em` permite invalidação programada do cache.                                                                                                                                    |
@@ -313,7 +361,7 @@ Os índices abaixo, definidos em `CREATE TABLE`, sustentam consultas críticas d
 
 ### Observações de manutenção
 
-- O schema é parcialmente bootstrapado em runtime: as funções `_ensure_email_verification_columns` e `_ensure_quota_favoritos_columns` em `api.py` aplicam, de forma idempotente, as colunas e índices definidos em [migrations/](migrations/). Alterações manuais nas tabelas envolvidas devem preservar essa idempotência.
+- O schema é parcialmente bootstrapado em runtime: as funções `_ensure_email_verification_columns` e `_ensure_quota_favoritos_columns` em `api.py` aplicam, de forma idempotente, as colunas e índices definidos em [migrations/](migrations/). As colunas `google_id` e `avatar_url` adicionadas por [2026_05_google_oauth.sql](migrations/2026_05_google_oauth.sql) devem ser aplicadas manualmente antes do primeiro deploy com Google OAuth. Alterações manuais nas tabelas envolvidas devem preservar essa idempotência.
 - Tipos `DATETIME` neste schema são _naive_ (sem timezone). O backend grava timestamps em UTC via `datetime.utcnow()`; a migração para colunas timezone-aware é um item de roadmap (ver [README_TESTES.md](README_TESTES.md#warnings-conhecidos-do-pytest)).
 - A política de `ON DELETE RESTRICT` significa que a exclusão de conta (`DELETE /auth/me`) **não remove** registros físicos: o fluxo realiza anonimização lógica em `usuarios` e revogação em `sessoes`, preservando integridade referencial com `avaliacoes`.
 
@@ -321,13 +369,11 @@ Os índices abaixo, definidos em `CREATE TABLE`, sustentam consultas críticas d
 
 ## Versionamento de API
 
-A partir de **v2.1.0** o caminho canônico de todos os endpoints públicos é `/v1/...`. A janela de coexistência mantém os caminhos legados (sem prefixo) funcionando como **alias** durante pelo menos **1 trimestre**, para evitar quebra de clientes existentes (incluindo o frontend deste repositório, que ainda chama os caminhos legados).
+Todos os endpoints públicos vivem exclusivamente em `/v1/...`. Não há rotas sem prefixo nem middleware de reescrita — cada rota é registrada diretamente com o prefixo `/v1/` no decorador.
 
-### Comportamento atual
+### Comportamento
 
-- Toda requisição em `/v1/<rota>` é reescrita pelo middleware `_api_version_middleware` para `<rota>` antes do roteamento. Resultado e contrato são idênticos aos da rota legada.
-- Toda resposta inclui o header `X-API-Version: v1`.
-- Respostas que vieram via prefixo `/v1` recebem também `X-API-Path-Rewritten: v1` (uso interno/depuração).
+- Toda resposta inclui o header `X-API-Version: v1` (via `_api_version_header_middleware`).
 - `/docs` (Swagger) reflete a versão corrente da API (`2.1.0`).
 
 ### Política de evolução
@@ -352,21 +398,22 @@ Alinhado a `docs/NEGOCIAL.md` H4:
 
 ## Decisões técnicas
 
-| Tema                  | Decisão                                                          | Trade-off                                                                                                                                                                                                                                               |
-| --------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend               | FastAPI + Pydantic v2                                            | Documentação automática, validação tipada; custo de adoção mínimo.                                                                                                                                                                                      |
-| ORM                   | SQLAlchemy 1.4 com SQL textual                                   | Controle fino sobre queries críticas; sem mapeamento ORM completo (menos abstração, mais SQL explícito).                                                                                                                                                |
-| Auth                  | JWT HS256 (access 15min) + refresh hash em DB                    | Refresh revogável; segredo único compartilhado (não suporta rotação multi-instância sem ajuste).                                                                                                                                                        |
-| Senhas                | bcrypt via `passlib` (`bcrypt==4.0.1` pinado)                    | `passlib 1.7.4` quebra com bcrypt ≥ 4.1; ver comentário em `requirements.txt`.                                                                                                                                                                          |
-| Verificação de e-mail | Token aleatório, **hash** persistido                             | Mesmo se o DB vazar, tokens não são reusáveis.                                                                                                                                                                                                          |
-| Cotas                 | Contagem em `avaliacoes` por dia                                 | Simples e auditável; depende de DB online (sem fallback in-memory).                                                                                                                                                                                     |
-| Guest tracking        | Cookie httpOnly `prevismob_guest_id` + fallback hash IP+UA       | Sem PII direto; fallback é "best effort" para clientes sem cookie.                                                                                                                                                                                      |
-| Migrações             | SQL idempotente em `migrations/` + bootstrap runtime em `api.py` | Não exige Alembic; risco de divergência se alguém rodar SQL manual incompatível.                                                                                                                                                                        |
-| ML                    | scikit-learn carregado via `joblib.load` no boot                 | Restart necessário ao trocar o `.pkl`; sem versionamento via API.                                                                                                                                                                                       |
-| Algoritmo do modelo   | `RandomForestRegressor` (scikit-learn)                           | Treinado por `treinar_ia.py`; persistido como `MODEL_NAME="RandomForest"`/`MODEL_VERSION="v1.0.0"` em `modelos_ml`. Trocar de algoritmo exige atualizar `treinar_ia.py`, `MODEL_NAME`/`MODEL_VERSION` em `api.py` e `requirements.txt` simultaneamente. |
-| PDF                   | Gerador embutido (PDF 1.4 _single-stream_, sem reportlab/fpdf)   | Stack enxuta sem dependência adicional; limitações: somente texto, encoding WinAnsi/PDFDocEncoding (acentos sanitizados via `_pdf_sanitize`). Ver `_pdf_sanitize` em `api.py`.                                                                          |
-| Geo                   | Chamadas Google Maps por requisição                              | Custo por chamada; sem cache (item de roadmap).                                                                                                                                                                                                         |
-| Frontend              | HTML/CSS/JS puro, single page                                    | Zero build step; difícil de escalar para múltiplas telas.                                                                                                                                                                                               |
+| Tema                  | Decisão                                                           | Trade-off                                                                                                                                                                                                                                               |
+| --------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend               | FastAPI + Pydantic v2                                             | Documentação automática, validação tipada; custo de adoção mínimo.                                                                                                                                                                                      |
+| ORM                   | SQLAlchemy 1.4 com SQL textual                                    | Controle fino sobre queries críticas; sem mapeamento ORM completo (menos abstração, mais SQL explícito).                                                                                                                                                |
+| Auth                  | JWT HS256 (access 15min) + refresh hash em DB                     | Refresh revogável; segredo único compartilhado (não suporta rotação multi-instância sem ajuste).                                                                                                                                                        |
+| Senhas                | bcrypt via `passlib` (`bcrypt==4.0.1` pinado)                     | `passlib 1.7.4` quebra com bcrypt ≥ 4.1; ver comentário em `requirements.txt`.                                                                                                                                                                          |
+| Verificação de e-mail | Token aleatório, **hash** persistido                              | Mesmo se o DB vazar, tokens não são reusáveis.                                                                                                                                                                                                          |
+| Cotas                 | Contagem em `avaliacoes` por dia                                  | Simples e auditável; depende de DB online (sem fallback in-memory).                                                                                                                                                                                     |
+| Guest tracking        | Cookie httpOnly `prevismob_guest_id` + fallback hash IP+UA        | Sem PII direto; fallback é "best effort" para clientes sem cookie.                                                                                                                                                                                      |
+| Migrações             | SQL idempotente em `migrations/` + bootstrap runtime em `api.py`  | Não exige Alembic; risco de divergência se alguém rodar SQL manual incompatível.                                                                                                                                                                        |
+| ML                    | scikit-learn carregado via `joblib.load` no boot                  | Restart necessário ao trocar o `.pkl`; sem versionamento via API.                                                                                                                                                                                       |
+| Algoritmo do modelo   | `RandomForestRegressor` (scikit-learn)                            | Treinado por `treinar_ia.py`; persistido como `MODEL_NAME="RandomForest"`/`MODEL_VERSION="v1.0.0"` em `modelos_ml`. Trocar de algoritmo exige atualizar `treinar_ia.py`, `MODEL_NAME`/`MODEL_VERSION` em `api.py` e `requirements.txt` simultaneamente. |
+| PDF                   | Gerador embutido (PDF 1.4 _single-stream_, sem reportlab/fpdf)    | Stack enxuta sem dependência adicional; limitações: somente texto, encoding WinAnsi/PDFDocEncoding (acentos sanitizados via `_pdf_sanitize`). Ver `_pdf_sanitize` em `api.py`.                                                                          |
+| Geo                   | Chamadas Google Maps por requisição                               | Custo por chamada; sem cache (item de roadmap).                                                                                                                                                                                                         |
+| Frontend              | HTML/CSS/JS puro, multi-page (4 arquivos HTML independentes)      | Zero build step; cada página é auto-contida; sem framework de roteamento.                                                                                                                                                                               |
+| Google OAuth          | Google Identity Services (ID Token server-side via `google-auth`) | Sign-in social sem armazenar senha; depende de `GOOGLE_CLIENT_ID` e conectividade com `oauth2.googleapis.com`.                                                                                                                                          |
 
 ---
 
@@ -413,6 +460,6 @@ Alinhado a `docs/NEGOCIAL.md` H4:
 2. **Modelo ML:** trocar `modelo_imoveis.pkl` exige reiniciar o backend. As 7 features esperadas estão fixas no código (Quartos, Vagas, Condominio_m2, Distancia_Metro_km, Mercados_500m, Escolas_1000m, Parques_800m).
 3. **Nome do modelo no banco:** `MODEL_NAME = "RandomForest"` em `api.py` reflete o algoritmo realmente treinado em `treinar_ia.py` (`RandomForestRegressor`). Se migrar para outro estimador (ex.: XGBoost), atualizar simultaneamente `MODEL_NAME`, `MODEL_VERSION`, o script de treino e `requirements.txt`.
 4. **Cookies de guest** podem ser apagados pelo usuário a qualquer momento, zerando a cota guest — isso é esperado e não é bug.
-5. **Histórico inline** depende de o frontend estar na `#app-section`. Não tente reaproveitar o componente na landing sem revisar o trecho que oculta dados em `mostrarLanding()`.
+5. **Histórico** vive em `historico.html`. Não exponha dados de avaliações em `index.html` — a landing não monta nem busca histórico.
 6. **Tokens de verificação** têm TTL de 24h por padrão. Reenvio respeita cooldown (`EMAIL_VERIFY_RESEND_COOLDOWN_MIN`) para evitar abuso.
 7. **CSV legado em `/condominio`:** ainda lê `data/dataset_aguas_claras_completo.csv`. Se o dataset mudar, valide que as colunas usadas pelo endpoint continuam presentes.

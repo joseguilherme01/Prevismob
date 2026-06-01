@@ -6,7 +6,8 @@ Integração com dataset CSV para dados de proximidade georreferenciada
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 import joblib
@@ -28,6 +29,15 @@ import secrets
 import jwt
 from passlib.context import CryptContext
 
+# Google OAuth 2.0 — verificação server-side de ID Tokens.
+# ImportError em dev sem a lib instalada: o endpoint /auth/google retornará 503.
+try:
+    from google.oauth2 import id_token as _google_id_token
+    from google.auth.transport import requests as _google_requests
+    _GOOGLE_AUTH_AVAILABLE = True
+except ImportError:
+    _GOOGLE_AUTH_AVAILABLE = False
+
 # novas dependências para Google Maps e dotenv
 from dotenv import load_dotenv
 from geopy.distance import geodesic
@@ -38,6 +48,10 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 # Carrega variáveis de ambiente antes da configuração da aplicação
 load_dotenv(override=True)
+
+# Diretório exclusivo do frontend — StaticFiles aponta AQUI, nunca para a raiz,
+# para não expor .env, *.pkl, migrations/, data/ etc. via HTTP.
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 
 def _parse_cors_origins() -> list[str]:
@@ -62,13 +76,7 @@ def _parse_cors_origins() -> list[str]:
 
 app = FastAPI(
     title="PrevIsmob API",
-    description=(
-        "API para previsão de preços de imóveis em Águas Claras.\n\n"
-        "**Versionamento**: a partir de v2.1.0 o caminho canônico dos endpoints é "
-        "`/v1/...`. Os caminhos legados (sem prefixo) continuam funcionando como "
-        "alias durante a janela de coexistência (mínimo 1 trimestre). "
-        "Veja `README_ARQUITETURA.md` seção *Versionamento de API*."
-    ),
+    description="API para previsão de preços de imóveis em Águas Claras. Todos os endpoints vivem sob o prefixo `/v1/`.",
     version="2.1.0",
 )
 
@@ -106,10 +114,17 @@ app.add_middleware(
 _DEFAULT_CSP = (
     "default-src 'self'; "
     "img-src 'self' data: blob: https:; "
-    "font-src 'self' data:; "
-    "style-src 'self' 'unsafe-inline'; "
-    "script-src 'self' 'unsafe-inline'; "
+    "font-src 'self' data: https://fonts.gstatic.com; "
+    "style-src 'self' 'unsafe-inline' https://accounts.google.com https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+    # accounts.google.com/gsi/client: Google Identity Services.
+    # cdn.jsdelivr.net: assets do Swagger UI (/docs) servidos pelo FastAPI.
+    # fonts.googleapis.com: folhas de estilo do Google Fonts.
+    # Ambos adicionados explicitamente, sem curingas, para limitar a superfície.
+    "script-src 'self' 'unsafe-inline' https://accounts.google.com https://cdn.jsdelivr.net; "
     "connect-src 'self' http: https:; "
+    # Google Identity Services usa iframes para o botão de login.
+    # openstreetmap.org: mapas embed usados pelo frontend.
+    "frame-src https://accounts.google.com https://www.openstreetmap.org; "
     "frame-ancestors 'none'; "
     "base-uri 'self'; "
     "form-action 'self'"
@@ -126,35 +141,13 @@ async def _security_headers_middleware(request: Request, call_next):
     return response
 
 
-# ----------------------------------------------------------------------------
-# Versionamento de API: alias `/v1/...` -> caminho canônico atual
-#
-# Estratégia de transição:
-#   - O caminho canônico público passa a ser `/v1/...`.
-#   - Os caminhos legados (sem prefixo) continuam funcionando durante a
-#     janela de coexistência (mínimo 1 trimestre).
-#   - Quando uma requisição chega em `/v1/<rota>`, reescrevemos o caminho
-#     ASGI para `/<rota>` antes do roteamento, e adicionamos os headers
-#     padrão de versão (`X-API-Version`).
-# ----------------------------------------------------------------------------
 API_VERSION = "v1"
 
 
 @app.middleware("http")
-async def _api_version_middleware(request: Request, call_next):
-    path: str = request.scope.get("path", "") or ""
-    rewritten = False
-    if path == "/v1" or path.startswith("/v1/"):
-        new_path = path[len("/v1"):] or "/"
-        request.scope["path"] = new_path
-        raw = request.scope.get("raw_path")
-        if isinstance(raw, (bytes, bytearray)) and (raw == b"/v1" or raw.startswith(b"/v1/")):
-            request.scope["raw_path"] = raw[len(b"/v1"):] or b"/"
-        rewritten = True
+async def _api_version_header_middleware(request: Request, call_next):
     response = await call_next(request)
     response.headers.setdefault("X-API-Version", API_VERSION)
-    if rewritten:
-        response.headers.setdefault("X-API-Path-Rewritten", "v1")
     return response
 
 # ============================================================================
@@ -368,6 +361,15 @@ class VerificacaoEmailResponse(BaseModel):
     mensagem: str
 
 
+class GoogleAuthRequest(BaseModel):
+    """Payload para autenticação via Google OAuth 2.0.
+
+    O frontend envia apenas o ID Token retornado pelo Google Identity Services.
+    Toda validação (assinatura, aud, iss, exp) ocorre server-side via google-auth.
+    """
+    id_token: str = Field(..., min_length=10, description="ID Token emitido pelo Google Identity Services")
+
+
 def _mask_api_key(api_key: str | None) -> str:
     if not api_key:
         return "N/A"
@@ -500,6 +502,10 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-insecure-change-me")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+# GOOGLE_CLIENT_ID nunca pode ser hardcoded — obrigatoriamente via .env.
+# Ausência da variável desabilita /auth/google com 503 (sem crash).
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip() or None
 
 if JWT_SECRET_KEY == "dev-insecure-change-me":
     print(
@@ -734,6 +740,121 @@ def _ensure_quota_favoritos_columns() -> None:
 
 
 _ensure_quota_favoritos_columns()
+
+
+# ============================================================================
+# GOOGLE OAUTH — MIGRAÇÃO RUNTIME
+# ============================================================================
+
+def _ensure_google_oauth_columns() -> None:
+    """Migração runtime idempotente para suporte a Google OAuth.
+
+    Espelha migrations/2026_05_google_oauth.sql: adiciona google_id e
+    avatar_url em usuarios, cria UNIQUE INDEX em google_id e torna
+    senha_hash nullable (usuários OAuth não têm senha local).
+    """
+    if engine is None:
+        return
+    try:
+        with engine.begin() as conn:
+            existing = {
+                row[0]
+                for row in conn.execute(
+                    text(
+                        """
+                        SELECT COLUMN_NAME
+                        FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = 'usuarios'
+                        """
+                    )
+                ).all()
+            }
+
+            oauth_cols = {
+                "google_id": "VARCHAR(128) NULL",
+                "avatar_url": "VARCHAR(512) NULL",
+            }
+            for col, ddl in oauth_cols.items():
+                if col not in existing:
+                    conn.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col} {ddl}"))
+                    print(f"[migration] coluna adicionada: usuarios.{col}")
+
+            # Índice UNIQUE em google_id (NULLs múltiplos são permitidos no InnoDB).
+            idx_rows = conn.execute(
+                text(
+                    """
+                    SELECT INDEX_NAME, NON_UNIQUE
+                    FROM INFORMATION_SCHEMA.STATISTICS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'usuarios'
+                      AND COLUMN_NAME = 'google_id'
+                    """
+                )
+            ).all()
+            has_unique_google = any(int(r[1]) == 0 for r in idx_rows)
+            if not has_unique_google:
+                try:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE usuarios "
+                            "ADD UNIQUE INDEX ux_usuarios_google_id (google_id)"
+                        )
+                    )
+                    print("[migration] índice UNIQUE criado: ux_usuarios_google_id")
+                except SQLAlchemyError as exc:
+                    print(f"⚠️ Falha ao criar ux_usuarios_google_id: {exc}")
+
+            # senha_hash deve aceitar NULL para usuários OAuth-only.
+            nullable_row = conn.execute(
+                text(
+                    """
+                    SELECT IS_NULLABLE
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'usuarios'
+                      AND COLUMN_NAME = 'senha_hash'
+                    """
+                )
+            ).first()
+            if nullable_row and nullable_row[0] == "NO":
+                try:
+                    conn.execute(
+                        text("ALTER TABLE usuarios MODIFY COLUMN senha_hash VARCHAR(255) NULL")
+                    )
+                    print("[migration] usuarios.senha_hash alterado para NULL permitido")
+                except SQLAlchemyError as exc:
+                    print(f"⚠️ Falha ao alterar senha_hash para NULL: {exc}")
+
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Falha na migração automática de Google OAuth: {exc}")
+
+
+_ensure_google_oauth_columns()
+
+
+# ============================================================================
+# GOOGLE OAUTH — RATE LIMITER (in-memory, por IP)
+# ============================================================================
+import threading as _threading
+from collections import defaultdict as _defaultdict
+
+_google_auth_hits: dict[str, list[float]] = _defaultdict(list)
+_google_auth_hits_lock = _threading.Lock()
+_GOOGLE_AUTH_MAX_REQ = 10   # máx. requisições por janela
+_GOOGLE_AUTH_WINDOW  = 60   # janela em segundos
+
+
+def _google_auth_rate_ok(ip: str) -> bool:
+    """Retorna True se a requisição do IP está dentro do limite, False se excedeu."""
+    now = time.time()
+    cutoff = now - _GOOGLE_AUTH_WINDOW
+    with _google_auth_hits_lock:
+        _google_auth_hits[ip] = [t for t in _google_auth_hits[ip] if t > cutoff]
+        if len(_google_auth_hits[ip]) >= _GOOGLE_AUTH_MAX_REQ:
+            return False
+        _google_auth_hits[ip].append(now)
+        return True
 
 
 def _hash_guest_fallback(ip: str | None, ua: str | None) -> str:
@@ -1622,6 +1743,86 @@ def _get_user_verification_state(email: str) -> dict | None:
         return dict(row) if row else None
 
 
+# ============================================================================
+# GOOGLE OAUTH — HELPERS DE BANCO
+# ============================================================================
+
+def _get_user_by_google_id(google_id: str) -> dict | None:
+    """Busca usuário pelo google_id (campo 'sub' do ID Token)."""
+    if engine is None:
+        return None
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT id_usuario, nome, email, senha_hash, plano_id, papel, ativo,
+                       email_verificado_em, ultimo_login_em
+                FROM usuarios
+                WHERE google_id = :google_id
+                LIMIT 1
+                """
+            ),
+            {"google_id": google_id},
+        ).mappings().first()
+        return dict(row) if row else None
+
+
+def _link_google_id(user_id: int, google_id: str, avatar_url: str | None) -> None:
+    """Vincula google_id a uma conta existente (primeira vez que o usuário usa OAuth).
+
+    Também marca o e-mail como verificado — o Google garante a posse do endereço.
+    COALESCE preserva a data original se o e-mail já estava verificado.
+    """
+    if engine is None:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                UPDATE usuarios
+                   SET google_id  = :google_id,
+                       avatar_url = :avatar_url,
+                       email_verificado_em = COALESCE(email_verificado_em, CURRENT_TIMESTAMP)
+                 WHERE id_usuario = :user_id
+                """
+            ),
+            {"google_id": google_id, "avatar_url": avatar_url, "user_id": int(user_id)},
+        )
+
+
+def _insert_usuario_oauth(
+    nome: str, email: str, google_id: str, avatar_url: str | None
+) -> int:
+    """Cria usuário via OAuth: sem senha local, e-mail pré-verificado pelo Google.
+
+    google_id e avatar_url são armazenados; avatar_url nunca é usado para autenticação.
+    """
+    if engine is None:
+        raise HTTPException(status_code=500, detail="Banco de dados indisponível")
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                INSERT INTO usuarios (
+                    nome, email, senha_hash, plano_id, papel, ativo,
+                    email_verificado_em, google_id, avatar_url
+                )
+                VALUES (
+                    :nome, :email, NULL, 1, 'USUARIO', 1,
+                    CURRENT_TIMESTAMP, :google_id, :avatar_url
+                )
+                """
+            ),
+            {
+                "nome": nome,
+                "email": email,
+                "google_id": google_id,
+                "avatar_url": avatar_url,
+            },
+        )
+        return int(result.lastrowid)
+
+
 def _emitir_e_enviar_verificacao(user_id: int, email_destino: str) -> bool:
     """Gera novo token, persiste apenas o hash e dispara o e-mail. Retorna status do envio."""
     token = generate_verification_token()
@@ -1637,7 +1838,7 @@ def _emitir_e_enviar_verificacao(user_id: int, email_destino: str) -> bool:
 
 
 @app.post(
-    "/auth/register",
+    "/v1/auth/register",
     response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["Auth"],
@@ -1727,7 +1928,7 @@ async def auth_register(payload: RegisterRequest) -> RegisterResponse:
 
 
 @app.get(
-    "/auth/verificar-email",
+    "/v1/auth/verificar-email",
     response_model=VerificacaoEmailResponse,
     tags=["Auth"],
     summary="Confirma o e-mail do usuário via token",
@@ -1779,7 +1980,7 @@ async def auth_verificar_email(token: str) -> VerificacaoEmailResponse:
 
 
 @app.post(
-    "/auth/reenviar-verificacao",
+    "/v1/auth/reenviar-verificacao",
     tags=["Auth"],
     summary="Reenvia o e-mail de verificação",
     responses={
@@ -1823,7 +2024,7 @@ async def auth_reenviar_verificacao(payload: ReenvioVerificacaoRequest) -> dict:
     return mensagem_neutra
 
 
-@app.post("/auth/login", response_model=AuthResponse, tags=["Auth"])
+@app.post("/v1/auth/login", response_model=AuthResponse, tags=["Auth"])
 async def auth_login(payload: LoginRequest, request: Request):
     if engine is None:
         raise HTTPException(status_code=500, detail="Banco de dados indisponível")
@@ -1868,7 +2069,129 @@ async def auth_login(payload: LoginRequest, request: Request):
     )
 
 
-@app.post("/auth/refresh", response_model=AuthResponse, tags=["Auth"])
+@app.post(
+    "/v1/auth/google",
+    response_model=AuthResponse,
+    tags=["Auth"],
+    summary="Autentica ou registra usuário via Google OAuth 2.0",
+    responses={
+        200: {"description": "Autenticado com sucesso (login ou registro via Google)."},
+        401: {"description": "ID Token inválido, expirado ou audience incorreta."},
+        429: {"description": "Muitas tentativas — rate limit por IP."},
+        503: {"description": "Google OAuth não configurado neste servidor."},
+    },
+)
+async def auth_google(payload: GoogleAuthRequest, request: Request):
+    """Valida ID Token do Google server-side e emite JWT + refresh token próprios.
+
+    Fluxo de upsert:
+      1. Busca por google_id  → login direto (conta já vinculada).
+      2. Busca por e-mail     → vincula google_id sem criar duplicata (account takeover prevention).
+      3. Nenhum encontrado   → cria novo usuário (e-mail já verificado pelo Google).
+
+    Decisões de segurança:
+    - verify_oauth2_token() valida assinatura RSA, aud, iss e exp em uma chamada.
+    - google_id (sub) nunca é logado — apenas usado internamente como chave de vínculo.
+    - avatar_url armazenado para exibição futura; nunca participa de autenticação.
+    - Rate limiting por IP impede enumeração/brute-force no endpoint.
+    """
+    if not _GOOGLE_AUTH_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Módulo google-auth não instalado.")
+
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Login com Google não configurado neste servidor.")
+
+    if engine is None:
+        raise HTTPException(status_code=500, detail="Banco de dados indisponível")
+
+    # Rate limiting por IP — 10 req/min; nega sem revelar o motivo interno.
+    ip_origem = request.client.host if request and request.client else "unknown"
+    if not _google_auth_rate_ok(ip_origem):
+        raise HTTPException(
+            status_code=429,
+            detail="Muitas tentativas. Aguarde um momento e tente novamente.",
+            headers={"Retry-After": str(_GOOGLE_AUTH_WINDOW)},
+        )
+
+    # Verificação server-side do ID Token.
+    # verify_oauth2_token() valida: assinatura, aud == GOOGLE_CLIENT_ID, iss e exp.
+    # Qualquer desvio levanta ValueError — nunca confiamos nos claims sem verificação.
+    try:
+        id_info = _google_id_token.verify_oauth2_token(
+            payload.id_token,
+            _google_requests.Request(),
+            GOOGLE_CLIENT_ID,
+        )
+    except ValueError:
+        # Não logamos detalhes do erro para não vazar informações do token.
+        print("[auth/google] token_validation_failed")
+        raise HTTPException(status_code=401, detail="Token Google inválido ou expirado.")
+
+    google_sub = id_info.get("sub") or ""
+    email_google = (id_info.get("email") or "").strip().lower()
+    nome_google = (id_info.get("name") or "").strip() or email_google.split("@")[0]
+    avatar_url = id_info.get("picture") or None
+
+    if not google_sub or not email_google:
+        print("[auth/google] token_missing_required_claims")
+        raise HTTPException(status_code=401, detail="Token Google incompleto.")
+
+    agente_usuario = request.headers.get("user-agent") or None
+
+    # Upsert: tenta vincular a conta existente antes de criar uma nova.
+    user = _get_user_by_google_id(google_sub)
+
+    if not user:
+        user = _get_user_by_email(email_google)
+        if user:
+            # Conta normal existente: vincula google_id retroativamente.
+            # Protege contra account takeover — só vincula ao dono do e-mail.
+            _link_google_id(int(user["id_usuario"]), google_sub, avatar_url)
+        else:
+            # Novo usuário: cria com e-mail pré-verificado (Google já validou a posse).
+            try:
+                novo_id = _insert_usuario_oauth(nome_google, email_google, google_sub, avatar_url)
+            except IntegrityError as exc:
+                msg = str(getattr(exc, "orig", exc)).lower()
+                if "duplicate" in msg or "1062" in msg or "unique" in msg:
+                    # Condição de corrida: outro request criou o usuário entre os dois SELECTs.
+                    user = _get_user_by_email(email_google)
+                    if not user:
+                        raise HTTPException(status_code=500, detail="Erro ao criar conta OAuth.")
+                else:
+                    print(f"⚠️ [auth/google] IntegrityError inesperado: {exc}")
+                    raise HTTPException(status_code=500, detail="Erro ao criar conta OAuth.")
+            else:
+                user = _get_user_by_id(novo_id)
+                if not user:
+                    raise HTTPException(status_code=500, detail="Erro ao criar conta OAuth.")
+
+    if int(user.get("ativo", 1)) == 0:
+        raise HTTPException(status_code=403, detail="Usuário inativo.")
+
+    # Emite os mesmos tokens do fluxo normal — transparente para o frontend.
+    access_token = _create_access_token(user)
+    refresh_token = secrets.token_urlsafe(48)
+    refresh_hash = _hash_refresh_token(refresh_token)
+
+    _create_refresh_session(
+        user_id=int(user["id_usuario"]),
+        refresh_token_hash=refresh_hash,
+        ip_origem=ip_origem,
+        agente_usuario=agente_usuario,
+    )
+    _update_user_last_login(int(user["id_usuario"]))
+
+    return AuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="Bearer",
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        usuario=_build_user_payload(user),
+    )
+
+
+@app.post("/v1/auth/refresh", response_model=AuthResponse, tags=["Auth"])
 async def auth_refresh(payload: RefreshRequest):
     if engine is None:
         raise HTTPException(status_code=500, detail="Banco de dados indisponível")
@@ -1904,20 +2227,20 @@ async def auth_refresh(payload: RefreshRequest):
     )
 
 
-@app.post("/auth/logout", tags=["Auth"])
+@app.post("/v1/auth/logout", tags=["Auth"])
 async def auth_logout(payload: LogoutRequest):
     refresh_hash = _hash_refresh_token(payload.refresh_token)
     _revoke_refresh_session(refresh_hash)
     return {"status": "logout_realizado"}
 
 
-@app.get("/auth/me", tags=["Auth"])
+@app.get("/v1/auth/me", tags=["Auth"])
 async def auth_me(current_user: dict = Depends(get_current_user)):
     return {"usuario": _build_user_payload(current_user)}
 
 
 @app.delete(
-    "/auth/me",
+    "/v1/auth/me",
     tags=["Auth"],
     summary="Exclui (anonimiza) a conta do usuário autenticado",
     responses={
@@ -1948,22 +2271,33 @@ async def auth_me_delete(current_user: dict = Depends(get_current_user)):
         "mensagem": "Conta anonimizada e sessões revogadas. Dados pessoais foram removidos.",
     }
 
-@app.get("/", tags=["Info"])
-async def root():
-    """Rota raiz - informações da API"""
-    return {
-        "nome": "PrevIsmob API",
-        "descricao": "Sistema de previsão de preços de imóveis",
-        "versao": "2.1.0",
-        "api_version": API_VERSION,
-        "caminho_canonico": f"/{API_VERSION}",
-        "dataset_carregado": df_condominios is not None,
-        "modelo_carregado": modelo_ml is not None,
-        "endpoints_principais": ["/condominio", "/prever"]
-    }
+@app.get("/", include_in_schema=False)
+async def serve_frontend():
+    index = os.path.join(_STATIC_DIR, "index.html")
+    if os.path.isfile(index):
+        return FileResponse(index)
+    return {"nome": "PrevIsmob API", "versao": "2.1.0", "docs": "/docs"}
 
 
-@app.get("/condominio", response_model=List[str], tags=["Dados"])
+@app.get("/historico", include_in_schema=False)
+async def serve_historico():
+    f = os.path.join(_STATIC_DIR, "historico.html")
+    return FileResponse(f) if os.path.isfile(f) else Response(status_code=404)
+
+
+@app.get("/comparar", include_in_schema=False)
+async def serve_comparar():
+    f = os.path.join(_STATIC_DIR, "comparar.html")
+    return FileResponse(f) if os.path.isfile(f) else Response(status_code=404)
+
+
+@app.get("/previsao", include_in_schema=False)
+async def serve_previsao():
+    f = os.path.join(_STATIC_DIR, "previsao.html")
+    return FileResponse(f) if os.path.isfile(f) else Response(status_code=404)
+
+
+@app.get("/v1/condominio", response_model=List[str], tags=["Dados"])
 async def obter_condominio():
     """
     Retorna lista de nomes únicos de prédios/condomínios ordenados alfabeticamente.
@@ -1988,7 +2322,7 @@ async def obter_condominio():
         )
 
 
-@app.post("/prever", response_model=RespostaPrevicao, tags=["Previsão"])
+@app.post("/v1/prever", response_model=RespostaPrevicao, tags=["Previsão"])
 async def prever_preco(
     dados: DadosImovelUsuario,
     request: Request,
@@ -2334,7 +2668,7 @@ async def prever_preco(
         )
 
 
-@app.get("/quota", tags=["Previsão"])
+@app.get("/v1/quota", tags=["Previsão"])
 async def quota_status(
     request: Request,
     response: Response,
@@ -2372,8 +2706,28 @@ def _row_to_avaliacao_dict(row) -> dict:
     return d
 
 
+def _parse_ids_param(ids: str | None) -> list[int] | None:
+    """Parse comma-separated IDs into a list of positive ints. Returns None when ids is absent."""
+    if not ids:
+        return None
+    try:
+        parsed = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail="Parâmetro 'ids' deve conter apenas números inteiros separados por vírgula.",
+        )
+    if not parsed:
+        return None
+    if any(i <= 0 for i in parsed):
+        raise HTTPException(status_code=422, detail="IDs devem ser números positivos.")
+    if len(parsed) > 50:
+        raise HTTPException(status_code=422, detail="Máximo de 50 IDs por requisição.")
+    return parsed
+
+
 _HISTORICO_SELECT = """
-    SELECT a.id_avaliacao, a.criado_em, a.status, a.is_favorita,
+    SELECT a.id_avaliacoes AS id_avaliacao, a.criado_em, a.status, a.is_favorita,
            a.area_util_m2, a.valor_condominio_rs, a.quartos, a.vagas,
            a.preco_m2_minimo, a.preco_m2_sugerido, a.preco_m2_maximo,
            a.preco_total_minimo_rs, a.preco_total_sugerido_rs, a.preco_total_maximo_rs,
@@ -2383,7 +2737,7 @@ _HISTORICO_SELECT = """
 """
 
 
-@app.get("/historico", tags=["Histórico"])
+@app.get("/v1/historico", tags=["Histórico"])
 async def listar_historico(
     request: Request,
     limit: int = 20,
@@ -2433,7 +2787,7 @@ async def listar_historico(
     }
 
 
-@app.post("/favoritos/{avaliacao_id}", tags=["Histórico"])
+@app.post("/v1/favoritos/{avaliacao_id}", tags=["Histórico"])
 async def alternar_favorito(
     avaliacao_id: int,
     current_user: dict = Depends(get_current_user),
@@ -2450,8 +2804,8 @@ async def alternar_favorito(
         with engine.begin() as conn:
             row = conn.execute(
                 text(
-                    "SELECT id_avaliacao, usuario_id, is_favorita FROM avaliacoes "
-                    "WHERE id_avaliacao = :aid LIMIT 1"
+                    "SELECT id_avaliacoes, usuario_id, is_favorita FROM avaliacoes "
+                    "WHERE id_avaliacoes = :aid LIMIT 1"
                 ),
                 {"aid": int(avaliacao_id)},
             ).first()
@@ -2462,7 +2816,7 @@ async def alternar_favorito(
                 raise HTTPException(status_code=404, detail="Avaliação não encontrada.")
             novo = 0 if int(row[2] or 0) == 1 else 1
             conn.execute(
-                text("UPDATE avaliacoes SET is_favorita = :v WHERE id_avaliacao = :aid"),
+                text("UPDATE avaliacoes SET is_favorita = :v WHERE id_avaliacoes = :aid"),
                 {"v": novo, "aid": int(avaliacao_id)},
             )
     except HTTPException:
@@ -2474,31 +2828,45 @@ async def alternar_favorito(
     return {"id_avaliacao": int(avaliacao_id), "is_favorita": bool(novo)}
 
 
-@app.get("/comparar", tags=["Histórico"])
+@app.get("/v1/comparar", tags=["Histórico"])
 async def comparar_favoritas(
+    ids: str | None = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Retorna lista estruturada para comparar previsões favoritadas do usuário.
+    """Retorna lista estruturada para comparar previsões do usuário.
 
-    Resposta: ``{items:[...], campos:[...]}`` — itens contêm campos chave
-    (preços, área, quartos, vagas, condomínio) prontos para visualização
-    lado-a-lado no frontend.
+    Quando ``ids`` (ex: ``?ids=3,7``) é fornecido, retorna exatamente esses
+    registros (propriedade do usuário é verificada via ``usuario_id``).
+    Sem ``ids``, retorna todas as avaliações favoritadas.
+    Resposta: ``{items:[...], campos:[...]}``
     """
     if engine is None:
         raise HTTPException(status_code=500, detail="Banco de dados indisponível")
 
     usuario_id = int(current_user["id_usuario"])
-    sql = (
-        _HISTORICO_SELECT
-        + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO' AND a.is_favorita = 1"
-        + " ORDER BY a.criado_em DESC LIMIT 50"
-    )
+    ids_list = _parse_ids_param(ids)
+
+    if ids_list:
+        placeholders = ", ".join(f":id{i}" for i in range(len(ids_list)))
+        params: dict = {"uid": usuario_id, **{f"id{i}": v for i, v in enumerate(ids_list)}}
+        sql = (
+            _HISTORICO_SELECT
+            + f" WHERE a.id_avaliacoes IN ({placeholders}) AND a.usuario_id = :uid"
+            + " AND a.status = 'SUCESSO' ORDER BY a.criado_em DESC"
+        )
+    else:
+        params = {"uid": usuario_id}
+        sql = (
+            _HISTORICO_SELECT
+            + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO' AND a.is_favorita = 1"
+            + " ORDER BY a.criado_em DESC LIMIT 50"
+        )
     try:
         with engine.connect() as conn:
-            rows = conn.execute(text(sql), {"uid": usuario_id}).mappings().all()
+            rows = conn.execute(text(sql), params).mappings().all()
     except SQLAlchemyError as exc:
-        print(f"⚠️ Erro ao comparar favoritas: {exc}")
-        raise HTTPException(status_code=500, detail="Erro ao comparar favoritas.")
+        print(f"⚠️ Erro ao comparar: {exc}")
+        raise HTTPException(status_code=500, detail="Erro ao comparar avaliações.")
 
     campos = [
         {"chave": "nome_predio", "label": "Imóvel"},
@@ -2534,26 +2902,42 @@ def _stream_csv(items: list[dict]) -> bytes:
     return buf.getvalue().encode("utf-8-sig")  # BOM para Excel pt-BR
 
 
-@app.get("/export/csv", tags=["Histórico"])
+@app.get("/v1/export/csv", tags=["Histórico"])
 async def exportar_csv(
     favoritos_only: bool = False,
+    ids: str | None = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Exporta histórico do usuário como CSV (UTF-8 com BOM)."""
+    """Exporta histórico do usuário como CSV (UTF-8 com BOM).
+
+    Se ``ids`` for fornecido (ex: ``?ids=3,7``), exporta apenas esses registros.
+    """
     if engine is None:
         raise HTTPException(status_code=500, detail="Banco de dados indisponível")
 
     usuario_id = int(current_user["id_usuario"])
-    where_extra = " AND a.is_favorita = 1" if favoritos_only else ""
-    sql = (
-        _HISTORICO_SELECT
-        + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO'"
-        + where_extra
-        + " ORDER BY a.criado_em DESC LIMIT 1000"
-    )
+    ids_list = _parse_ids_param(ids)
+
+    if ids_list:
+        placeholders = ", ".join(f":id{i}" for i in range(len(ids_list)))
+        params: dict = {"uid": usuario_id, **{f"id{i}": v for i, v in enumerate(ids_list)}}
+        sql = (
+            _HISTORICO_SELECT
+            + f" WHERE a.id_avaliacoes IN ({placeholders}) AND a.usuario_id = :uid"
+            + " AND a.status = 'SUCESSO' ORDER BY a.criado_em DESC"
+        )
+    else:
+        where_extra = " AND a.is_favorita = 1" if favoritos_only else ""
+        params = {"uid": usuario_id}
+        sql = (
+            _HISTORICO_SELECT
+            + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO'"
+            + where_extra
+            + " ORDER BY a.criado_em DESC LIMIT 1000"
+        )
     try:
         with engine.connect() as conn:
-            rows = conn.execute(text(sql), {"uid": usuario_id}).mappings().all()
+            rows = conn.execute(text(sql), params).mappings().all()
     except SQLAlchemyError as exc:
         print(f"⚠️ Erro ao exportar CSV: {exc}")
         raise HTTPException(status_code=500, detail="Erro ao exportar CSV.")
@@ -2685,26 +3069,42 @@ def _build_simple_pdf(title: str, lines: list[str]) -> bytes:
     return out.getvalue()
 
 
-@app.get("/export/pdf", tags=["Histórico"])
+@app.get("/v1/export/pdf", tags=["Histórico"])
 async def exportar_pdf(
     favoritos_only: bool = False,
+    ids: str | None = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Exporta histórico do usuário em PDF text-only (sem dependência externa)."""
+    """Exporta histórico do usuário em PDF text-only (sem dependência externa).
+
+    Se ``ids`` for fornecido (ex: ``?ids=3,7``), exporta apenas esses registros.
+    """
     if engine is None:
         raise HTTPException(status_code=500, detail="Banco de dados indisponível")
 
     usuario_id = int(current_user["id_usuario"])
-    where_extra = " AND a.is_favorita = 1" if favoritos_only else ""
-    sql = (
-        _HISTORICO_SELECT
-        + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO'"
-        + where_extra
-        + " ORDER BY a.criado_em DESC LIMIT 200"
-    )
+    ids_list = _parse_ids_param(ids)
+
+    if ids_list:
+        placeholders = ", ".join(f":id{i}" for i in range(len(ids_list)))
+        params: dict = {"uid": usuario_id, **{f"id{i}": v for i, v in enumerate(ids_list)}}
+        sql = (
+            _HISTORICO_SELECT
+            + f" WHERE a.id_avaliacoes IN ({placeholders}) AND a.usuario_id = :uid"
+            + " AND a.status = 'SUCESSO' ORDER BY a.criado_em DESC"
+        )
+    else:
+        where_extra = " AND a.is_favorita = 1" if favoritos_only else ""
+        params = {"uid": usuario_id}
+        sql = (
+            _HISTORICO_SELECT
+            + " WHERE a.usuario_id = :uid AND a.status = 'SUCESSO'"
+            + where_extra
+            + " ORDER BY a.criado_em DESC LIMIT 200"
+        )
     try:
         with engine.connect() as conn:
-            rows = conn.execute(text(sql), {"uid": usuario_id}).mappings().all()
+            rows = conn.execute(text(sql), params).mappings().all()
     except SQLAlchemyError as exc:
         print(f"⚠️ Erro ao exportar PDF: {exc}")
         raise HTTPException(status_code=500, detail="Erro ao exportar PDF.")
@@ -2741,7 +3141,7 @@ async def exportar_pdf(
     )
 
 
-@app.get("/status", tags=["Info"])
+@app.get("/v1/status", tags=["Info"])
 async def status():
     """Verifica status da API, dataset e modelo"""
     db_ok = False
@@ -2768,6 +3168,18 @@ async def status():
         ]
     }
 
+
+# ============================================================================
+# ARQUIVOS ESTÁTICOS DO FRONTEND
+# ============================================================================
+# Montado APÓS todas as rotas da API — Starlette itera app.router.routes em
+# ordem de registro. Route (decoradores @app.get/post) são registrados antes
+# deste Mount, portanto /docs, /auth/..., /v1/..., /status etc. têm prioridade
+# absoluta e nunca são interceptados pelo StaticFiles.
+# StaticFiles aponta para static/ (não a raiz do projeto) para não expor
+# .env, *.pkl, migrations/, data/ e demais arquivos sensíveis via HTTP.
+if os.path.isdir(_STATIC_DIR):
+    app.mount("/", StaticFiles(directory=_STATIC_DIR), name="frontend")
 
 # ============================================================================
 # INICIALIZAÇÃO DO SERVIDOR

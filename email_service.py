@@ -153,11 +153,11 @@ def build_verification_link(token: str) -> str:
     """Monta o link de verificação.
 
     ``APP_BASE_URL`` deve apontar para a página do frontend que interpreta o
-    deep link ``?token=...`` (ex.: ``http://127.0.0.1:5500/index.html``).
+    deep link ``?token=...`` (ex.: ``http://127.0.0.1:8000``).
     Respeita querystring pré-existente na base. Espaços acidentais em
     ``APP_BASE_URL`` são removidos; vazio após ``strip`` usa fallback local.
     """
-    _FALLBACK = "http://127.0.0.1:5500/index.html"
+    _FALLBACK = "http://127.0.0.1:8000"
     base = (_env("APP_BASE_URL") or "").strip()
     if not base:
         base = _FALLBACK

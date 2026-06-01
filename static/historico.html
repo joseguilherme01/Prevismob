@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Histórico · PrevIsmob</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="pg-shell">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <header class="pg-header">
+    <div class="pg-header__brand" style="cursor:pointer" onclick="window.location.href='/'">
+      <span class="nav__logo-icon" aria-hidden="true">◈</span>
+      <span>PrevIsmob</span>
+    </div>
+    <div class="pg-header__actions" style="margin-left:auto;">
+      <a href="#" class="btn btn--primary btn--sm"
+         onclick="event.preventDefault(); window.location.href='/previsao';">Nova previsão</a>
+    </div>
+    <div class="dash-user" id="dashUser" style="display:none; position:relative; cursor:pointer" title="">
+      <span class="dash-user__avatar" aria-hidden="true">👤</span>
+      <span class="dash-user__info">
+        <strong id="dashUserNome">—</strong>
+        <small id="dashUserEmail">—</small>
+      </span>
+      <div class="dash-user__menu" id="dashUserMenu" hidden
+           style="position:absolute; top:calc(100% + 8px); right:0; z-index:900;
+                  background:var(--c-white); border:1px solid var(--c-gray-200);
+                  border-radius:var(--radius); box-shadow:var(--shadow-md);
+                  padding:var(--sp-2); min-width:120px;">
+        <button class="btn btn--outline btn--sm btn--full" id="btn-logout" type="button">Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Conteúdo principal ─────────────────────────────────────────── -->
+  <main class="pg-main">
+
+    <!-- Título da página + mini guia -->
+    <div style="margin-bottom: var(--sp-6);">
+      <h1 style="font-size: var(--text-xl); font-weight: 700; color: var(--c-navy); margin-bottom: var(--sp-3);">
+        Histórico de Avaliações
+      </h1>
+      <div style="display:flex; align-items:center; gap: var(--sp-3); flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap: var(--sp-2); font-size: var(--text-sm); color: var(--c-gray-600);">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--c-blue); color:#fff; font-size:0.7rem; font-weight:700; flex-shrink:0;">1</span>
+          <span>Selecione <strong>2 avaliações</strong> clicando nos cards</span>
+        </div>
+        <span style="color:var(--c-gray-300); font-size: var(--text-sm);">→</span>
+        <div style="display:flex; align-items:center; gap: var(--sp-2); font-size: var(--text-sm); color: var(--c-gray-600);">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--c-blue); color:#fff; font-size:0.7rem; font-weight:700; flex-shrink:0;">2</span>
+          <span>Clique em <strong>Comparar</strong> no botão que aparece na tela</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grade de cards (preenchida via JS) -->
+    <div class="hc-grid" id="hc-grid"></div>
+
+    <!-- Estado vazio -->
+    <div class="hc-empty" id="hc-empty" hidden>
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 12h6m-3-3v6M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z"/>
+      </svg>
+      <p>Nenhuma avaliação encontrada.<br>Faça sua primeira avaliação na página inicial.</p>
+      <a href="/" class="btn btn--primary">Avaliar um imóvel</a>
+    </div>
+
+    <!-- Carregar mais -->
+    <div class="hc-load-more" id="hc-load-more-wrap" hidden>
+      <button class="btn btn--outline" id="btn-load-more">Carregar mais</button>
+    </div>
+
+  </main>
+
+  <!-- ── Botão flutuante "Comparar" ─────────────────────────────────── -->
+  <button class="hc-float-btn" id="hc-float-compare" aria-live="polite">
+    Comparar <span id="hc-float-count">0</span> selecionados
+  </button>
+
+  <script src="config.js"></script>
+  <script>
+    "use strict";
+
+    /* ── Config ───────────────────────────────────────────────────────── */
+    const _API = (window.PREVISMOB_CONFIG && window.PREVISMOB_CONFIG.API_BASE)
+      || `${location.protocol}//${location.hostname}:8000`;
+
+    /* ── Utilitários de auth (inline para evitar side-effects do script.js) */
+    const _getAt  = () => localStorage.getItem("prevismob_access_token");
+    const _getRt  = () => localStorage.getItem("prevismob_refresh_token");
+
+    function _salvar(d) {
+      if (d.access_token)  localStorage.setItem("prevismob_access_token",  d.access_token);
+      if (d.refresh_token) localStorage.setItem("prevismob_refresh_token", d.refresh_token);
+    }
+
+    function _limpar() {
+      ["prevismob_access_token", "prevismob_refresh_token", "prevismob_user"].forEach(k =>
+        localStorage.removeItem(k)
+      );
+    }
+
+    async function _renovar() {
+      const rt = _getRt();
+      if (!rt) return false;
+      try {
+        const r = await fetch(`${_API}/v1/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: rt }),
+        });
+        if (!r.ok) { _limpar(); return false; }
+        _salvar(await r.json());
+        return true;
+      } catch { return false; }
+    }
+
+    async function _authFetch(url, opts = {}, retry = true) {
+      const token = _getAt();
+      const headers = { ...(opts.headers || {}) };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      let r = await fetch(url, { ...opts, headers });
+      if (r.status === 401 && retry) {
+        const ok = await _renovar();
+        if (ok) return _authFetch(url, opts, false);
+        _limpar();
+        location.href = "/";
+        return r;
+      }
+      return r;
+    }
+
+    /* ── Formatação ───────────────────────────────────────────────────── */
+    const _br = n =>
+      n == null ? "—" : Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const _esc = s =>
+      String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+    /* ── Estado da página ─────────────────────────────────────────────── */
+    const PAGE_SIZE  = 12;
+    let   _offset    = 0;
+    let   _total     = 0;
+    const _selected  = new Set();   // Set<number> de id_avaliacao
+
+    /* ── Renderização ─────────────────────────────────────────────────── */
+    function _renderSkeletons(n = 6) {
+      return Array.from({ length: n }, () => `
+        <div class="hc-skeleton" aria-hidden="true">
+          <div class="hc-skeleton__line hc-skeleton__line--short"></div>
+          <div class="hc-skeleton__line hc-skeleton__line--med"></div>
+          <div class="hc-skeleton__line hc-skeleton__line--full"></div>
+          <div class="hc-skeleton__line hc-skeleton__line--full"></div>
+          <div class="hc-skeleton__line hc-skeleton__line--price"></div>
+        </div>
+      `).join("");
+    }
+
+    function _renderCard(item) {
+      const id  = item.id_avaliacao;
+      const sel = _selected.has(id);
+      const dis = !sel && _selected.size >= 2;
+
+      const date = (item.criado_em || "").slice(0, 10).split("-").reverse().join("/");
+      const nome = _esc(item.nome_predio || "Imóvel sem nome");
+      const area = item.area_util_m2 != null ? `${Number(item.area_util_m2).toFixed(0)} m²` : "—";
+      const qt   = item.quartos  != null ? item.quartos  : "—";
+      const vg   = item.vagas    != null ? item.vagas    : "—";
+      const cond = item.valor_condominio_rs != null ? `R$ ${_br(item.valor_condominio_rs)}` : "—";
+      const pric = item.preco_total_sugerido_rs != null ? `R$ ${_br(item.preco_total_sugerido_rs)}` : "—";
+      const fav  = item.is_favorita
+        ? `<span class="hc-card__fav" title="Favorito">★</span>` : "";
+
+      return `
+        <div class="hc-card${sel ? " is-selected" : ""}${dis ? " is-disabled" : ""}"
+             data-id="${id}"
+             role="checkbox"
+             aria-checked="${sel}"
+             tabindex="${dis ? -1 : 0}">
+          <div class="hc-card__check" aria-hidden="true"></div>
+          <div class="hc-card__date">${date}</div>
+          <div class="hc-card__name">${nome}</div>
+          <div class="hc-card__meta">
+            <div class="hc-card__meta-item">
+              <span class="hc-card__meta-label">Área</span>
+              <span class="hc-card__meta-value">${area}</span>
+            </div>
+            <div class="hc-card__meta-item">
+              <span class="hc-card__meta-label">Quartos</span>
+              <span class="hc-card__meta-value">${qt}</span>
+            </div>
+            <div class="hc-card__meta-item">
+              <span class="hc-card__meta-label">Vagas</span>
+              <span class="hc-card__meta-value">${vg}</span>
+            </div>
+            <div class="hc-card__meta-item">
+              <span class="hc-card__meta-label">Condomínio</span>
+              <span class="hc-card__meta-value">${cond}</span>
+            </div>
+          </div>
+          <div class="hc-card__price">
+            <div class="hc-card__price-label">Total sugerido</div>
+            <div class="hc-card__price-value">${pric}</div>
+          </div>
+          ${fav}
+        </div>`;
+    }
+
+    /* ── Lógica de seleção ────────────────────────────────────────────── */
+    function _toggleSelect(id) {
+      if (_selected.has(id)) {
+        _selected.delete(id);
+      } else if (_selected.size < 2) {
+        _selected.add(id);
+      }
+      // Atualiza todos os cards sem re-renderizar o grid inteiro
+      document.querySelectorAll(".hc-card").forEach(card => {
+        const cid = Number(card.dataset.id);
+        const s   = _selected.has(cid);
+        const d   = !s && _selected.size >= 2;
+        card.classList.toggle("is-selected", s);
+        card.classList.toggle("is-disabled",  d);
+        card.setAttribute("aria-checked", String(s));
+        card.tabIndex = d ? -1 : 0;
+      });
+      _updateFloatBtn();
+    }
+
+    function _updateFloatBtn() {
+      const btn = document.getElementById("hc-float-compare");
+      const cnt = document.getElementById("hc-float-count");
+      cnt.textContent = String(_selected.size);
+      btn.classList.toggle("is-visible", _selected.size === 2);
+    }
+
+    /* ── Carregamento de dados ────────────────────────────────────────── */
+    async function _loadMore(reset = false) {
+      const grid = document.getElementById("hc-grid");
+
+      if (reset) {
+        _offset = 0;
+        _selected.clear();
+        _updateFloatBtn();
+        grid.innerHTML = _renderSkeletons();
+      }
+
+      const r = await _authFetch(
+        `${_API}/v1/historico?limit=${PAGE_SIZE}&offset=${_offset}`
+      );
+      if (!r.ok) {
+        grid.innerHTML =
+          `<p style="color:rgba(255,255,255,.4);padding:2rem">Erro ao carregar histórico.</p>`;
+        return;
+      }
+
+      const data  = await r.json();
+      _total      = data.total;
+      const items = data.items || [];
+
+      if (reset) grid.innerHTML = "";
+
+      if (items.length === 0 && _offset === 0) {
+        document.getElementById("hc-empty").hidden    = false;
+        document.getElementById("hc-load-more-wrap").hidden = true;
+        return;
+      }
+
+      items.forEach(item => grid.insertAdjacentHTML("beforeend", _renderCard(item)));
+      _offset += items.length;
+
+      const hasMore = _offset < _total;
+      document.getElementById("hc-load-more-wrap").hidden = !hasMore;
+    }
+
+    /* ── Auth guard ───────────────────────────────────────────────────── */
+    async function _checkAuth() {
+      if (!_getAt()) { location.href = "/"; return; }
+      const r = await _authFetch(`${_API}/v1/auth/me`);
+      if (!r.ok) { _limpar(); location.href = "/"; return; }
+      try {
+        const d = await r.json();
+        _preencherUsuario(d.usuario || null);
+      } catch (_) {}
+    }
+
+    /* ── Card de usuário (header) ─────────────────────────────────────── */
+    function _preencherUsuario(usuario) {
+      const box     = document.getElementById("dashUser");
+      const nomeEl  = document.getElementById("dashUserNome");
+      const emailEl = document.getElementById("dashUserEmail");
+      if (!box || !nomeEl || !emailEl) return;
+      if (usuario && usuario.email) {
+        nomeEl.textContent  = usuario.nome || "Usuário";
+        emailEl.textContent = usuario.email;
+        box.title           = `${usuario.nome || ""} — ${usuario.email}`;
+        box.style.display   = "inline-flex";
+      } else {
+        box.style.display = "none";
+      }
+    }
+
+    /* ── Bootstrap ────────────────────────────────────────────────────── */
+    document.addEventListener("DOMContentLoaded", async () => {
+      await _checkAuth();
+      await _loadMore(true);
+
+      // Cliques nos cards (delegação de evento)
+      document.getElementById("hc-grid").addEventListener("click", e => {
+        const card = e.target.closest(".hc-card");
+        if (!card || card.classList.contains("is-disabled")) return;
+        _toggleSelect(Number(card.dataset.id));
+      });
+
+      // Teclado (espaço/enter) nos cards
+      document.getElementById("hc-grid").addEventListener("keydown", e => {
+        if (e.key !== " " && e.key !== "Enter") return;
+        const card = e.target.closest(".hc-card");
+        if (!card || card.classList.contains("is-disabled")) return;
+        e.preventDefault();
+        _toggleSelect(Number(card.dataset.id));
+      });
+
+      document.getElementById("btn-load-more").addEventListener("click", () => _loadMore());
+
+      document.getElementById("hc-float-compare").addEventListener("click", () => {
+        const ids = [..._selected].join(",");
+        location.href = `/comparar?ids=${ids}`;
+      });
+
+      // Card de usuário — abre/fecha o menu e logout
+      const userBox  = document.getElementById("dashUser");
+      const userMenu = document.getElementById("dashUserMenu");
+      if (userBox && userMenu) {
+        userBox.addEventListener("click", (e) => {
+          if (e.target.closest("#dashUserMenu")) return;
+          userMenu.hidden = !userMenu.hidden;
+        });
+        document.addEventListener("click", (e) => {
+          if (!userBox.contains(e.target)) userMenu.hidden = true;
+        });
+      }
+      const btnLogout = document.getElementById("btn-logout");
+      if (btnLogout) {
+        btnLogout.addEventListener("click", () => {
+          localStorage.removeItem("prevismob_access_token");
+          localStorage.removeItem("prevismob_refresh_token");
+          window.location.href = "/";
+        });
+      }
+
+    });
+  </script>
+</body>
+</html>

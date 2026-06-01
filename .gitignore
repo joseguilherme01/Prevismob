@@ -20,3 +20,5 @@ Thumbs.db
 # IDE
 .vscode/
 
+# Configuração local com credenciais OAuth (não subir para o GitHub)
+config.js

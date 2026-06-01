@@ -63,3 +63,11 @@ geopy==2.4.1                    # Cálculo de distância geodésica
 python-dotenv==1.0.0
 httpx==0.27.2
 starlette==0.27.0
+
+# ------------------------------------------------------------------------
+# Google OAuth 2.0
+# ------------------------------------------------------------------------
+# google-auth: verificação server-side de ID Tokens do Google Identity Services.
+# cachecontrol: opcional, mas recomendado — reduz chamadas à JWKS do Google.
+google-auth>=2.0.0
+cachecontrol>=0.13.0

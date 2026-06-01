@@ -28,7 +28,7 @@ Guia operacional da suite de testes. Para visão geral, ver [README.md](README.m
 | Integrado (API)           | `pytest` + `fastapi.testclient` | `tests/test_*.py`                                      | Rotas HTTP com banco substituído pelo `FakeDB` (`tests/fake_db.py`).   |
 | Integrado (segurança)     | `pytest`                        | `tests/test_security_hardenings.py`                    | Headers, sanitização de logs, política de referrer.                    |
 | Integrado (headers)       | `pytest`                        | `tests/test_security_headers_global.py`                | CSP, X-Frame-Options, Referrer-Policy, X-Content-Type-Options globais. |
-| Integrado (versionamento) | `pytest`                        | `tests/test_api_versioning.py`                         | Alias `/v1/...` → rota legada; header `X-API-Version`.                 |
+| Integrado (versionamento) | `pytest`                        | `tests/test_api_versioning.py`                         | Rotas `/v1/...`; header `X-API-Version` em todas as respostas.         |
 | Integrado (LGPD)          | `pytest`                        | `tests/test_account_deletion.py`                       | `DELETE /auth/me`: anonimização, revogação de sessões, idempotência.   |
 | Manual                    | Navegador                       | [Checklist](#checklist-manual-de-frontend)             | UX guest/auth, navegação, exports.                                     |
 
@@ -108,7 +108,7 @@ Os endpoints são exercitados via `tests/test_quotas_favoritos.py` no nível de 
 
 - `/prever` em fluxo feliz não é exercitado em testes automatizados (depende de mocks pesados de Google Maps + estimador). Cobertura existente é limitada a autorização, validação e quota.
 - `/export/csv` e `/export/pdf` não validam o conteúdo binário/textual gerado (apenas autorização).
-- `/comparar`: o endpoint atual retorna a lista de favoritos do usuário autenticado (não aceita `ids=` arbitrários). Não há cenário explícito de cross-user, mas a seleção por `usuario_id` no SQL já isola dados.
+- `/v1/comparar?ids=ID1,ID2`: suporta comparação de avaliações específicas por ID. Não há cenário explícito de cross-user, mas a seleção por `usuario_id` no SQL já isola dados.
 
 > Se aplicável, ao adicionar uma nova feature de histórico, escreva o teste correspondente seguindo o padrão de `client.get(...)` + assert no payload.
 
@@ -120,10 +120,8 @@ Arquivo: [`tests/test_api_versioning.py`](tests/test_api_versioning.py).
 
 Cobertura:
 
-- `/v1/` retorna o mesmo metadado do root e ainda expõe `api_version`.
-- `/v1/status` produz o mesmo body que `/status` (alias).
+- `/v1/status` retorna metadados da API e estado do modelo/banco.
 - Toda resposta inclui `X-API-Version: v1`.
-- Caminho legado também recebe o header (mantém clientes existentes informados).
 
 ---
 
@@ -149,24 +147,22 @@ Escopo atual:
 - Logs **não vazam token** fora de ambiente `development`.
 - Em `development`, logs incluem o link de verificação (modo dev intencional).
 - Sanitização de `event_label` remove tags HTML.
-- `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` e `Content-Security-Policy` (com `frame-ancestors 'none'`) presentes em **todas as rotas** — testado em rotas legadas e em `/v1/...`.
+- `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` e `Content-Security-Policy` (com `frame-ancestors 'none'`) presentes em **todas as rotas** `/v1/...`.
 - Log de entrega real só ocorre quando SMTP envia de fato.
 
 > Cobertura intencionalmente focada em pontos sensíveis. **Não** há varredura tipo OWASP automatizada — é responsabilidade do revisor checar headers/CORS/secret em produção.
-
-> **Falhas pré-existentes conhecidas** em `tests/test_security_hardenings.py` (4 casos) cobrem o marcador `[DEV]` em logs do `email_service`, que atualmente não é emitido. São falhas de coerência entre teste e implementação anteriores a esta iteração; corrigir requer alinhar `email_service.py` ou os testes (escopo separado).
 
 ---
 
 ## Checklist manual de frontend
 
-Rodar localmente (`python api.py` + `python -m http.server 8001`).
+Rodar localmente (`uvicorn api:app --reload`).
 
 ### Como guest
 
 - [ ] Landing carrega sem erros no console.
 - [ ] Navbar mostra botões **Entrar** e **Criar conta**.
-- [ ] Clicar em **Avaliar Imóvel** abre o app.
+- [ ] Clicar em **Avaliar Imóvel** navega para `/previsao`.
 - [ ] Realizar 2 previsões válidas → badge mostra cota consumida.
 - [ ] 3ª previsão exibe mensagem amigável de limite (resposta 429).
 - [ ] Voltar para landing mantém estado guest.
@@ -177,11 +173,12 @@ Rodar localmente (`python api.py` + `python -m http.server 8001`).
 - [ ] Cadastro dispara e-mail (em dev, link aparece no terminal do backend).
 - [ ] Login antes de verificar retorna mensagem de e-mail não verificado.
 - [ ] Após verificação, login funciona e a navbar troca para o estado autenticado.
+- [ ] **Login com Google** funciona (botão Google na tela de login; sem etapa de verificação de e-mail).
 - [ ] Badge de cota muda para `0/10` (ou valor atual) imediatamente após login.
-- [ ] Página `app` exibe **histórico inline** com avaliações anteriores.
-- [ ] Histórico **não aparece** ao voltar para a landing.
+- [ ] Página `/historico` exibe avaliações anteriores.
+- [ ] Histórico não é acessível sem autenticação (redireciona para landing).
 - [ ] Favoritar/desfavoritar persiste após reload.
-- [ ] Comparar 2+ avaliações renderiza tabela lado a lado.
+- [ ] Comparar 2 avaliações em `/comparar` renderiza gráfico radar lado a lado.
 - [ ] Exportar CSV baixa arquivo válido.
 - [ ] Exportar PDF baixa arquivo válido.
 - [ ] Logout volta para landing pública.
