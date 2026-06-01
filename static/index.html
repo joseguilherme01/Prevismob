@@ -81,19 +81,43 @@
             Avaliar Imóvel
           </button>
           <!-- Card de usuário: filho direto do nav__container → último elemento visível no desktop (hamburger é display:none ≥768px) -->
-          <div class="dash-user" id="dashUser" data-auth-state="auth" hidden title=""
-               style="position:relative; cursor:pointer;">
+          <div
+            class="dash-user"
+            id="dashUser"
+            data-auth-state="auth"
+            hidden
+            title=""
+            style="position: relative; cursor: pointer"
+          >
             <span class="dash-user__avatar" aria-hidden="true">👤</span>
             <span class="dash-user__info">
               <strong id="dashUserNome">—</strong>
               <small id="dashUserEmail">—</small>
             </span>
-            <div class="dash-user__menu" id="dashUserMenu" hidden
-                 style="position:absolute; top:calc(100% + 8px); right:0; z-index:900;
-                        background:var(--c-white); border:1px solid var(--c-gray-200);
-                        border-radius:var(--radius); box-shadow:var(--shadow-md);
-                        padding:var(--sp-2); min-width:120px;">
-              <button class="btn btn--outline btn--sm btn--full" id="nav-btn-logout" type="button">Sair</button>
+            <div
+              class="dash-user__menu"
+              id="dashUserMenu"
+              hidden
+              style="
+                position: absolute;
+                top: calc(100% + 8px);
+                right: 0;
+                z-index: 900;
+                background: var(--c-white);
+                border: 1px solid var(--c-gray-200);
+                border-radius: var(--radius);
+                box-shadow: var(--shadow-md);
+                padding: var(--sp-2);
+                min-width: 120px;
+              "
+            >
+              <button
+                class="btn btn--outline btn--sm btn--full"
+                id="nav-btn-logout"
+                type="button"
+              >
+                Sair
+              </button>
             </div>
           </div>
           <button
@@ -491,15 +515,49 @@
                       autocomplete="current-password"
                       required
                     />
-                    <button type="button" class="btn-toggle-senha" aria-label="Mostrar senha" data-target="login_senha">
-                      <svg class="eye-icon eye-show" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
+                    <button
+                      type="button"
+                      class="btn-toggle-senha"
+                      aria-label="Mostrar senha"
+                      data-target="login_senha"
+                    >
+                      <svg
+                        class="eye-icon eye-show"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path
+                          d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                        />
+                        <circle cx="12" cy="12" r="3" />
                       </svg>
-                      <svg class="eye-icon eye-hide" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden>
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      <svg
+                        class="eye-icon eye-hide"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        hidden
+                      >
+                        <path
+                          d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
+                        />
+                        <path
+                          d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+                        />
+                        <line x1="1" y1="1" x2="23" y2="23" />
                       </svg>
                     </button>
                   </div>
@@ -535,7 +593,9 @@
                 data-client_id é injetado pelo script.js a partir de
                 window.PREVISMOB_CONFIG.GOOGLE_CLIENT_ID — nunca hardcoded aqui.
               -->
-              <div class="google-btn-wrap"><div id="google-btn-login" class="google-btn-container"></div></div>
+              <div class="google-btn-wrap">
+                <div id="google-btn-login" class="google-btn-container"></div>
+              </div>
 
               <button
                 type="button"
@@ -612,15 +672,49 @@
                       minlength="8"
                       required
                     />
-                    <button type="button" class="btn-toggle-senha" aria-label="Mostrar senha" data-target="reg_senha">
-                      <svg class="eye-icon eye-show" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
+                    <button
+                      type="button"
+                      class="btn-toggle-senha"
+                      aria-label="Mostrar senha"
+                      data-target="reg_senha"
+                    >
+                      <svg
+                        class="eye-icon eye-show"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path
+                          d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                        />
+                        <circle cx="12" cy="12" r="3" />
                       </svg>
-                      <svg class="eye-icon eye-hide" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden>
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      <svg
+                        class="eye-icon eye-hide"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        hidden
+                      >
+                        <path
+                          d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
+                        />
+                        <path
+                          d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+                        />
+                        <line x1="1" y1="1" x2="23" y2="23" />
                       </svg>
                     </button>
                   </div>
@@ -650,15 +744,49 @@
                       minlength="8"
                       required
                     />
-                    <button type="button" class="btn-toggle-senha" aria-label="Mostrar senha" data-target="reg_senha2">
-                      <svg class="eye-icon eye-show" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
+                    <button
+                      type="button"
+                      class="btn-toggle-senha"
+                      aria-label="Mostrar senha"
+                      data-target="reg_senha2"
+                    >
+                      <svg
+                        class="eye-icon eye-show"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path
+                          d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                        />
+                        <circle cx="12" cy="12" r="3" />
                       </svg>
-                      <svg class="eye-icon eye-hide" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden>
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      <svg
+                        class="eye-icon eye-hide"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        hidden
+                      >
+                        <path
+                          d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
+                        />
+                        <path
+                          d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+                        />
+                        <line x1="1" y1="1" x2="23" y2="23" />
                       </svg>
                     </button>
                   </div>
@@ -677,7 +805,12 @@
               <div class="auth-divider"><span>ou</span></div>
 
               <!-- Botão Google — mesma configuração do painel de login -->
-              <div class="google-btn-wrap"><div id="google-btn-register" class="google-btn-container"></div></div>
+              <div class="google-btn-wrap">
+                <div
+                  id="google-btn-register"
+                  class="google-btn-container"
+                ></div>
+              </div>
 
               <button
                 type="button"
@@ -688,9 +821,20 @@
               </button>
 
               <p class="auth-seguranca">
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
                 Seus dados são protegidos com criptografia.
               </p>

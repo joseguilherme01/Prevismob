@@ -447,10 +447,16 @@ function atualizarNavAuth(autenticadoOverride) {
     el.setAttribute("aria-hidden", logado ? "false" : "true");
   });
 
-  const dashUserNome  = document.getElementById("dashUserNome");
+  const dashUserNome = document.getElementById("dashUserNome");
   const dashUserEmail = document.getElementById("dashUserEmail");
-  if (dashUserNome)  dashUserNome.textContent  = logado ? (usuarioSessao && (usuarioSessao.nome  || "Usuário")) : "—";
-  if (dashUserEmail) dashUserEmail.textContent = logado ? (usuarioSessao && (usuarioSessao.email || ""))       : "—";
+  if (dashUserNome)
+    dashUserNome.textContent = logado
+      ? usuarioSessao && (usuarioSessao.nome || "Usuário")
+      : "—";
+  if (dashUserEmail)
+    dashUserEmail.textContent = logado
+      ? usuarioSessao && (usuarioSessao.email || "")
+      : "—";
 }
 
 // =====================================================================
@@ -876,7 +882,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   });
 
   // ========== DROPDOWN DO USUÁRIO NA LANDING ==========
-  const navUser     = document.getElementById("dashUser");
+  const navUser = document.getElementById("dashUser");
   const navUserMenu = document.getElementById("dashUserMenu");
   if (navUser && navUserMenu) {
     navUser.addEventListener("click", (e) => {
@@ -929,7 +935,10 @@ document.addEventListener("DOMContentLoaded", async function () {
       const hideIcon = btn.querySelector(".eye-hide");
       if (showIcon) showIcon.hidden = isPassword;
       if (hideIcon) hideIcon.hidden = !isPassword;
-      btn.setAttribute("aria-label", isPassword ? "Ocultar senha" : "Mostrar senha");
+      btn.setAttribute(
+        "aria-label",
+        isPassword ? "Ocultar senha" : "Mostrar senha",
+      );
     });
   });
 

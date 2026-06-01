@@ -1,669 +1,918 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Avaliar Imóvel · PrevIsmob</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-
-  <!-- ── Header ─────────────────────────────────────────────────────── -->
-  <header class="dash-header">
-    <div class="dash-header__inner">
-      <button class="btn btn--ghost btn--sm" onclick="window.location.href='/'">
-        ← Voltar
-      </button>
-      <div class="dash-header__brand">
-        <span class="nav__logo-icon" aria-hidden="true">◈</span>
-        <span>PrevIsmob</span>
-      </div>
-      <div class="dash-header__actions">
-        <span class="dash-header__tag">Análise de Imóvel</span>
-        <span class="quota-badge" id="quotaBadge" title="Previsões diárias" hidden>
-          <span aria-hidden="true">⏱</span>
-          <span id="quotaText">—</span>
-        </span>
-        <button class="btn btn--ghost btn--sm" id="btn-historico" type="button"
-                onclick="window.location.href='/historico'" hidden>
-          Histórico
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Avaliar Imóvel · PrevIsmob</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <header class="dash-header">
+      <div class="dash-header__inner">
+        <button
+          class="btn btn--ghost btn--sm"
+          onclick="window.location.href = '/'"
+        >
+          ← Voltar
         </button>
-        <div class="dash-user" id="dashUser" style="display:none; position:relative; cursor:pointer; margin-left:auto;" title="">
-          <span class="dash-user__avatar" aria-hidden="true">👤</span>
-          <span class="dash-user__info">
-            <strong id="dashUserNome">—</strong>
-            <small id="dashUserEmail">—</small>
+        <div class="dash-header__brand" style="cursor:pointer" onclick="window.location.href='/'">
+          <span class="nav__logo-icon" aria-hidden="true">◈</span>
+          <span>PrevIsmob</span>
+        </div>
+        <div class="dash-header__actions">
+          <span class="dash-header__tag">Análise de Imóvel</span>
+          <span
+            class="quota-badge"
+            id="quotaBadge"
+            title="Previsões diárias"
+            hidden
+          >
+            <span aria-hidden="true">⏱</span>
+            <span id="quotaText">—</span>
           </span>
-          <div class="dash-user__menu" id="dashUserMenu" hidden
-               style="position:absolute; top:calc(100% + 8px); right:0; z-index:900;
-                      background:var(--c-white); border:1px solid var(--c-gray-200);
-                      border-radius:var(--radius); box-shadow:var(--shadow-md);
-                      padding:var(--sp-2); min-width:120px;">
-            <button class="btn btn--outline btn--sm btn--full" id="btn-logout" type="button">Sair</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- ── Erro banner ────────────────────────────────────────────────── -->
-  <div class="erro-banner" id="mensagemErro" role="alert" aria-live="assertive">
-    <div class="erro-banner__inner">
-      <span class="erro-banner__icon" aria-hidden="true">⚠</span>
-      <span id="textoErro"></span>
-      <button class="erro-banner__close" aria-label="Fechar erro"
-        onclick="document.getElementById('mensagemErro').classList.remove('visivel','critico')">✕</button>
-    </div>
-  </div>
-
-  <!-- ── Main ───────────────────────────────────────────────────────── -->
-  <main class="dash-main">
-
-    <!-- Banner de limite atingido -->
-    <div class="quota-banner" id="quotaLimitBanner" role="alert" hidden>
-      <div class="quota-banner__content">
-        <span class="quota-banner__icon" aria-hidden="true">🔒</span>
-        <div>
-          <strong id="quotaLimitTitulo">Limite diário atingido</strong>
-          <p id="quotaLimitTexto">Você usou todas as previsões gratuitas de hoje.</p>
-        </div>
-      </div>
-      <div class="quota-banner__actions">
-        <button type="button" class="btn btn--primary btn--sm" id="quotaCtaLogin">Entrar</button>
-        <button type="button" class="btn btn--outline btn--sm" id="quotaCtaRegister">Criar conta grátis</button>
-      </div>
-    </div>
-
-    <div class="dash-grid">
-
-      <!-- ── Formulário ──────────────────────────────────────────────── -->
-      <aside class="dash-form-panel">
-        <div class="dash-form-panel__header">
-          <h2>📋 Dados do Imóvel</h2>
-          <p>Preencha as características para obter a avaliação de mercado</p>
-        </div>
-        <form id="formularioImovel" class="form" novalidate>
-          <div class="form-group">
-            <label class="form-label" for="nome_predio">Condomínio ou endereço</label>
-            <div class="form-input-wrap">
-              <span class="form-input-icon" aria-hidden="true">📍</span>
-              <input type="text" id="nome_predio" name="nome_predio" class="form-input"
-                placeholder="Ex.: Ed. Supremo ou Rua 25 Norte, 100 — Águas Claras"
-                autocomplete="off" minlength="5" required />
-            </div>
-            <small class="form-hint">Informe o nome do condomínio ou endereço completo. O mapa será gerado automaticamente.</small>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="area_util">Área útil (m²)</label>
-              <div class="form-input-wrap">
-                <span class="form-input-icon" aria-hidden="true">📐</span>
-                <input type="number" id="area_util" name="area_util" class="form-input"
-                  placeholder="Ex: 80" min="1" step="1" required />
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="valor_condominio">Condomínio (R$)</label>
-              <div class="form-input-wrap">
-                <span class="form-input-icon" aria-hidden="true">💳</span>
-                <input type="number" id="valor_condominio" name="valor_condominio" class="form-input"
-                  placeholder="Ex: 800" min="0" step="1" required />
-              </div>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="quartos">Quartos</label>
-              <div class="form-select-wrap">
-                <select id="quartos" name="quartos" class="form-select" required>
-                  <option value="">Selecione</option>
-                  <option value="1">1 quarto</option>
-                  <option value="2">2 quartos</option>
-                  <option value="3">3 quartos</option>
-                  <option value="4">4 quartos</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="vagas">Vagas</label>
-              <div class="form-select-wrap">
-                <select id="vagas" name="vagas" class="form-select" required>
-                  <option value="">Selecione</option>
-                  <option value="0">0 vaga</option>
-                  <option value="1">1 vaga</option>
-                  <option value="2">2 vagas</option>
-                  <option value="3">3 vagas</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn--primary btn--full" id="btnCalcular">
-            <span aria-hidden="true">⚡</span> Calcular valor de mercado
+          <button
+            class="btn btn--outline btn--sm"
+            id="btn-historico"
+            type="button"
+            onclick="window.location.href = '/historico'"
+            hidden
+          >
+            Histórico
           </button>
-          <button type="button" class="btn btn--outline btn--full" id="btnLimpar">
-            Limpar campos
-          </button>
-        </form>
-      </aside>
-
-      <!-- ── Resultados ──────────────────────────────────────────────── -->
-      <section class="dash-results-panel" id="resultado" aria-live="polite">
-
-        <!-- Estado vazio -->
-        <div class="results-empty" id="results-empty">
-          <div class="results-empty__icon" aria-hidden="true">🏢</div>
-          <h3>Aguardando análise</h3>
-          <p>Preencha o formulário ao lado e clique em <strong>Calcular</strong> para ver o resultado aqui.</p>
-        </div>
-
-        <!-- Cards de preço -->
-        <div class="price-cards" id="price-cards" style="display:none">
-          <div class="price-card price-card--min">
-            <div class="price-card__label">Valor Mínimo</div>
-            <div class="price-card__value" id="valorTotalMin">—</div>
-            <div class="price-card__sub">Piso de mercado</div>
-          </div>
-          <div class="price-card price-card--sug">
-            <div class="price-card__badge">Recomendado</div>
-            <div class="price-card__label">Valor Sugerido</div>
-            <div class="price-card__value" id="valorTotalSug">—</div>
-            <div class="price-card__sub">Preço justo de mercado</div>
-          </div>
-          <div class="price-card price-card--max">
-            <div class="price-card__label">Valor Máximo</div>
-            <div class="price-card__value" id="valorTotalMax">—</div>
-            <div class="price-card__sub">Teto de valorização</div>
-          </div>
-        </div>
-
-        <!-- Mapa + contexto urbano -->
-        <div class="dash-map-row" id="dash-map-row" style="display:none">
-          <div class="dash-map-wrap">
-            <div class="dash-map-wrap__header">
-              <span>🗺 Localização do imóvel</span>
-              <span id="metro_nome" class="metro-badge">—</span>
-            </div>
-            <iframe id="mapa_iframe" class="mapa"
-              title="Mapa de localização do imóvel analisado"
-              loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-              src="" allowfullscreen></iframe>
-            <div class="dash-map-wrap__footer">Fonte: © OpenStreetMap contributors</div>
-          </div>
-          <div class="loc-badges-panel">
-            <h4 class="loc-badges-panel__title">Contexto Urbano</h4>
-            <div class="loc-badge">
-              <div class="loc-badge__icon" aria-hidden="true">🚇</div>
-              <div class="loc-badge__info">
-                <span class="loc-badge__label">Distância ao Metrô</span>
-                <strong><span id="loc_distancia">—</span> km</strong>
-              </div>
-            </div>
-            <div class="loc-badge">
-              <div class="loc-badge__icon" aria-hidden="true">🛒</div>
-              <div class="loc-badge__info">
-                <span class="loc-badge__label">Mercados (500 m)</span>
-                <strong><span id="loc_mercados">—</span></strong>
-              </div>
-            </div>
-            <div class="loc-badge">
-              <div class="loc-badge__icon" aria-hidden="true">🎓</div>
-              <div class="loc-badge__info">
-                <span class="loc-badge__label">Escolas (1 km)</span>
-                <strong><span id="loc_escolas">—</span></strong>
-              </div>
-            </div>
-            <div class="loc-badge">
-              <div class="loc-badge__icon" aria-hidden="true">🌳</div>
-              <div class="loc-badge__info">
-                <span class="loc-badge__label">Parques (800 m)</span>
-                <strong><span id="loc_parques">—</span></strong>
-              </div>
+          <div
+            class="dash-user"
+            id="dashUser"
+            style="
+              display: none;
+              position: relative;
+              cursor: pointer;
+              margin-left: auto;
+            "
+            title=""
+          >
+            <span class="dash-user__avatar" aria-hidden="true">👤</span>
+            <span class="dash-user__info">
+              <strong id="dashUserNome">—</strong>
+              <small id="dashUserEmail">—</small>
+            </span>
+            <div
+              class="dash-user__menu"
+              id="dashUserMenu"
+              hidden
+              style="
+                position: absolute;
+                top: calc(100% + 8px);
+                right: 0;
+                z-index: 900;
+                background: var(--c-white);
+                border: 1px solid var(--c-gray-200);
+                border-radius: var(--radius);
+                box-shadow: var(--shadow-md);
+                padding: var(--sp-2);
+                min-width: 120px;
+              "
+            >
+              <button
+                class="btn btn--outline btn--sm btn--full"
+                id="btn-logout"
+                type="button"
+              >
+                Sair
+              </button>
             </div>
           </div>
         </div>
+      </div>
+    </header>
 
-        <!-- Gráfico -->
-        <div class="chart-panel" id="chart-panel" style="display:none">
-          <div class="chart-panel__header">
-            <div>
-              <h4>📈 Tendência de Preço por m²</h4>
-              <span class="chart-panel__sub">Últimos 7 meses — Águas Claras</span>
-            </div>
-            <div class="chart-legend">
-              <span class="chart-legend__item chart-legend__item--blue">Este imóvel</span>
-              <span class="chart-legend__item chart-legend__item--gray">Média do bairro</span>
-            </div>
-          </div>
-          <div class="chart-wrap">
-            <canvas id="graficoTendencia" aria-label="Gráfico de tendência de preço por m²"></canvas>
-          </div>
-        </div>
-
-      </section>
+    <!-- ── Erro banner ────────────────────────────────────────────────── -->
+    <div
+      class="erro-banner"
+      id="mensagemErro"
+      role="alert"
+      aria-live="assertive"
+    >
+      <div class="erro-banner__inner">
+        <span class="erro-banner__icon" aria-hidden="true">⚠</span>
+        <span id="textoErro"></span>
+        <button
+          class="erro-banner__close"
+          aria-label="Fechar erro"
+          onclick="
+            document
+              .getElementById('mensagemErro')
+              .classList.remove('visivel', 'critico')
+          "
+        >
+          ✕
+        </button>
+      </div>
     </div>
-  </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="config.js"></script>
-  <script>
-    "use strict";
+    <!-- ── Main ───────────────────────────────────────────────────────── -->
+    <main class="dash-main">
+      <!-- Banner de limite atingido -->
+      <div class="quota-banner" id="quotaLimitBanner" role="alert" hidden>
+        <div class="quota-banner__content">
+          <span class="quota-banner__icon" aria-hidden="true">🔒</span>
+          <div>
+            <strong id="quotaLimitTitulo">Limite diário atingido</strong>
+            <p id="quotaLimitTexto">
+              Você usou todas as previsões gratuitas de hoje.
+            </p>
+          </div>
+        </div>
+        <div class="quota-banner__actions">
+          <button
+            type="button"
+            class="btn btn--primary btn--sm"
+            id="quotaCtaLogin"
+          >
+            Entrar
+          </button>
+          <button
+            type="button"
+            class="btn btn--outline btn--sm"
+            id="quotaCtaRegister"
+          >
+            Criar conta grátis
+          </button>
+        </div>
+      </div>
 
-    /* ── Config ───────────────────────────────────────────────────────── */
-    const _API = (window.PREVISMOB_CONFIG && window.PREVISMOB_CONFIG.API_BASE)
-      || `${location.protocol}//${location.hostname}:8000`;
+      <div class="dash-grid">
+        <!-- ── Formulário ──────────────────────────────────────────────── -->
+        <aside class="dash-form-panel">
+          <div class="dash-form-panel__header">
+            <h2>📋 Dados do Imóvel</h2>
+            <p>Preencha as características para obter a avaliação de mercado</p>
+          </div>
+          <form id="formularioImovel" class="form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="nome_predio"
+                >Condomínio ou endereço</label
+              >
+              <div class="form-input-wrap">
+                <span class="form-input-icon" aria-hidden="true">📍</span>
+                <input
+                  type="text"
+                  id="nome_predio"
+                  name="nome_predio"
+                  class="form-input"
+                  placeholder="Ex.: Ed. Supremo ou Rua 25 Norte, 100 — Águas Claras"
+                  autocomplete="off"
+                  minlength="5"
+                  required
+                />
+              </div>
+              <small class="form-hint"
+                >Informe o nome do condomínio ou endereço completo. O mapa será
+                gerado automaticamente.</small
+              >
+            </div>
 
-    /* ── Auth ─────────────────────────────────────────────────────────── */
-    const _AK = "prevismob_access_token";
-    const _RK = "prevismob_refresh_token";
-    const _getAt = () => localStorage.getItem(_AK);
-    const _getRt = () => localStorage.getItem(_RK);
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="area_util">Área útil (m²)</label>
+                <div class="form-input-wrap">
+                  <span class="form-input-icon" aria-hidden="true">📐</span>
+                  <input
+                    type="number"
+                    id="area_util"
+                    name="area_util"
+                    class="form-input"
+                    placeholder="Ex: 80"
+                    min="1"
+                    step="1"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="valor_condominio"
+                  >Condomínio (R$)</label
+                >
+                <div class="form-input-wrap">
+                  <span class="form-input-icon" aria-hidden="true">💳</span>
+                  <input
+                    type="number"
+                    id="valor_condominio"
+                    name="valor_condominio"
+                    class="form-input"
+                    placeholder="Ex: 800"
+                    min="0"
+                    step="1"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
 
-    function _salvar(d) {
-      if (d.access_token)  localStorage.setItem(_AK, d.access_token);
-      if (d.refresh_token) localStorage.setItem(_RK, d.refresh_token);
-    }
-    function _limpar() {
-      [_AK, _RK, "prevismob_user"].forEach(k => localStorage.removeItem(k));
-    }
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="quartos">Quartos</label>
+                <div class="form-select-wrap">
+                  <select
+                    id="quartos"
+                    name="quartos"
+                    class="form-select"
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    <option value="1">1 quarto</option>
+                    <option value="2">2 quartos</option>
+                    <option value="3">3 quartos</option>
+                    <option value="4">4 quartos</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="vagas">Vagas</label>
+                <div class="form-select-wrap">
+                  <select id="vagas" name="vagas" class="form-select" required>
+                    <option value="">Selecione</option>
+                    <option value="0">0 vaga</option>
+                    <option value="1">1 vaga</option>
+                    <option value="2">2 vagas</option>
+                    <option value="3">3 vagas</option>
+                  </select>
+                </div>
+              </div>
+            </div>
 
-    async function _renovar() {
-      const rt = _getRt();
-      if (!rt) return false;
-      try {
-        const r = await fetch(`${_API}/v1/auth/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: rt }),
+            <button
+              type="submit"
+              class="btn btn--primary btn--full"
+              id="btnCalcular"
+            >
+              <span aria-hidden="true">⚡</span> Calcular valor de mercado
+            </button>
+            <button
+              type="button"
+              class="btn btn--outline btn--full"
+              id="btnLimpar"
+            >
+              Limpar campos
+            </button>
+          </form>
+        </aside>
+
+        <!-- ── Resultados ──────────────────────────────────────────────── -->
+        <section class="dash-results-panel" id="resultado" aria-live="polite">
+          <!-- Estado vazio -->
+          <div class="results-empty" id="results-empty">
+            <div class="results-empty__icon" aria-hidden="true">🏢</div>
+            <h3>Aguardando análise</h3>
+            <p>
+              Preencha o formulário ao lado e clique em
+              <strong>Calcular</strong> para ver o resultado aqui.
+            </p>
+          </div>
+
+          <!-- Cards de preço -->
+          <div class="price-cards" id="price-cards" style="display: none">
+            <div class="price-card price-card--min">
+              <div class="price-card__label">Valor Mínimo</div>
+              <div class="price-card__value" id="valorTotalMin">—</div>
+              <div class="price-card__sub">Piso de mercado</div>
+            </div>
+            <div class="price-card price-card--sug">
+              <div class="price-card__badge">Recomendado</div>
+              <div class="price-card__label">Valor Sugerido</div>
+              <div class="price-card__value" id="valorTotalSug">—</div>
+              <div class="price-card__sub">Preço justo de mercado</div>
+            </div>
+            <div class="price-card price-card--max">
+              <div class="price-card__label">Valor Máximo</div>
+              <div class="price-card__value" id="valorTotalMax">—</div>
+              <div class="price-card__sub">Teto de valorização</div>
+            </div>
+          </div>
+
+          <!-- Mapa + contexto urbano -->
+          <div class="dash-map-row" id="dash-map-row" style="display: none">
+            <div class="dash-map-wrap">
+              <div class="dash-map-wrap__header">
+                <span>🗺 Localização do imóvel</span>
+                <span id="metro_nome" class="metro-badge">—</span>
+              </div>
+              <iframe
+                id="mapa_iframe"
+                class="mapa"
+                title="Mapa de localização do imóvel analisado"
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+                src=""
+                allowfullscreen
+              ></iframe>
+              <div class="dash-map-wrap__footer">
+                Fonte: © OpenStreetMap contributors
+              </div>
+            </div>
+            <div class="loc-badges-panel">
+              <h4 class="loc-badges-panel__title">Contexto Urbano</h4>
+              <div class="loc-badge">
+                <div class="loc-badge__icon" aria-hidden="true">🚇</div>
+                <div class="loc-badge__info">
+                  <span class="loc-badge__label">Distância ao Metrô</span>
+                  <strong><span id="loc_distancia">—</span> km</strong>
+                </div>
+              </div>
+              <div class="loc-badge">
+                <div class="loc-badge__icon" aria-hidden="true">🛒</div>
+                <div class="loc-badge__info">
+                  <span class="loc-badge__label">Mercados (500 m)</span>
+                  <strong><span id="loc_mercados">—</span></strong>
+                </div>
+              </div>
+              <div class="loc-badge">
+                <div class="loc-badge__icon" aria-hidden="true">🎓</div>
+                <div class="loc-badge__info">
+                  <span class="loc-badge__label">Escolas (1 km)</span>
+                  <strong><span id="loc_escolas">—</span></strong>
+                </div>
+              </div>
+              <div class="loc-badge">
+                <div class="loc-badge__icon" aria-hidden="true">🌳</div>
+                <div class="loc-badge__info">
+                  <span class="loc-badge__label">Parques (800 m)</span>
+                  <strong><span id="loc_parques">—</span></strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gráfico -->
+          <div class="chart-panel" id="chart-panel" style="display: none">
+            <div class="chart-panel__header">
+              <div>
+                <h4>📈 Tendência de Preço por m²</h4>
+                <span class="chart-panel__sub"
+                  >Últimos 7 meses — Águas Claras</span
+                >
+              </div>
+              <div class="chart-legend">
+                <span class="chart-legend__item chart-legend__item--blue"
+                  >Este imóvel</span
+                >
+                <span class="chart-legend__item chart-legend__item--gray"
+                  >Média do bairro</span
+                >
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <canvas
+                id="graficoTendencia"
+                aria-label="Gráfico de tendência de preço por m²"
+              ></canvas>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="config.js"></script>
+    <script>
+      "use strict";
+
+      /* ── Config ───────────────────────────────────────────────────────── */
+      const _API =
+        (window.PREVISMOB_CONFIG && window.PREVISMOB_CONFIG.API_BASE) ||
+        `${location.protocol}//${location.hostname}:8000`;
+
+      /* ── Auth ─────────────────────────────────────────────────────────── */
+      const _AK = "prevismob_access_token";
+      const _RK = "prevismob_refresh_token";
+      const _getAt = () => localStorage.getItem(_AK);
+      const _getRt = () => localStorage.getItem(_RK);
+
+      function _salvar(d) {
+        if (d.access_token) localStorage.setItem(_AK, d.access_token);
+        if (d.refresh_token) localStorage.setItem(_RK, d.refresh_token);
+      }
+      function _limpar() {
+        [_AK, _RK, "prevismob_user"].forEach((k) => localStorage.removeItem(k));
+      }
+
+      async function _renovar() {
+        const rt = _getRt();
+        if (!rt) return false;
+        try {
+          const r = await fetch(`${_API}/v1/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: rt }),
+          });
+          if (!r.ok) {
+            _limpar();
+            return false;
+          }
+          _salvar(await r.json());
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      async function _authFetch(url, opts = {}, retry = true) {
+        const token = _getAt();
+        const headers = { ...(opts.headers || {}) };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const r = await fetch(url, {
+          ...opts,
+          headers,
+          credentials: "include",
         });
-        if (!r.ok) { _limpar(); return false; }
-        _salvar(await r.json());
-        return true;
-      } catch { return false; }
-    }
-
-    async function _authFetch(url, opts = {}, retry = true) {
-      const token = _getAt();
-      const headers = { ...(opts.headers || {}) };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const r = await fetch(url, { ...opts, headers, credentials: "include" });
-      if (r.status === 401 && retry) {
-        const ok = await _renovar();
-        if (ok) return _authFetch(url, opts, false);
-        _limpar();
-        location.href = "/";
+        if (r.status === 401 && retry) {
+          const ok = await _renovar();
+          if (ok) return _authFetch(url, opts, false);
+          _limpar();
+          location.href = "/";
+          return r;
+        }
         return r;
       }
-      return r;
-    }
 
-    /* ── Header / sessão ──────────────────────────────────────────────── */
-    function _atualizarHeader(usuario) {
-      const logado = !!(usuario && usuario.email);
-      const box    = document.getElementById("dashUser");
-      const nomeEl = document.getElementById("dashUserNome");
-      const emailEl= document.getElementById("dashUserEmail");
-      const btnH   = document.getElementById("btn-historico");
+      /* ── Header / sessão ──────────────────────────────────────────────── */
+      function _atualizarHeader(usuario) {
+        const logado = !!(usuario && usuario.email);
+        const box = document.getElementById("dashUser");
+        const nomeEl = document.getElementById("dashUserNome");
+        const emailEl = document.getElementById("dashUserEmail");
+        const btnH = document.getElementById("btn-historico");
 
-      if (box && nomeEl && emailEl) {
-        if (logado) {
-          nomeEl.textContent  = usuario.nome  || "Usuário";
-          emailEl.textContent = usuario.email;
-          box.title           = `${usuario.nome || ""} — ${usuario.email}`;
-          box.style.display   = "inline-flex";
-        } else {
-          box.style.display = "none";
+        if (box && nomeEl && emailEl) {
+          if (logado) {
+            nomeEl.textContent = usuario.nome || "Usuário";
+            emailEl.textContent = usuario.email;
+            box.title = `${usuario.nome || ""} — ${usuario.email}`;
+            box.style.display = "inline-flex";
+          } else {
+            box.style.display = "none";
+          }
+        }
+        if (btnH) btnH.hidden = !logado;
+      }
+
+      async function _restaurarSessao() {
+        const at = _getAt(),
+          rt = _getRt();
+        if (!at && !rt) return null;
+        if (!at && rt) {
+          const ok = await _renovar();
+          if (!ok) {
+            _limpar();
+            return null;
+          }
+        }
+        try {
+          const r = await _authFetch(
+            `${_API}/v1/auth/me`,
+            { method: "GET", headers: { Accept: "application/json" } },
+            false,
+          );
+          if (!r.ok) {
+            _limpar();
+            return null;
+          }
+          const d = await r.json();
+          return d.usuario || null;
+        } catch {
+          _limpar();
+          return null;
         }
       }
-      if (btnH) btnH.hidden = !logado;
-    }
 
-    async function _restaurarSessao() {
-      const at = _getAt(), rt = _getRt();
-      if (!at && !rt) return null;
-      if (!at && rt) {
-        const ok = await _renovar();
-        if (!ok) { _limpar(); return null; }
-      }
-      try {
-        const r = await _authFetch(`${_API}/v1/auth/me`,
-          { method: "GET", headers: { Accept: "application/json" } }, false);
-        if (!r.ok) { _limpar(); return null; }
-        const d = await r.json();
-        return d.usuario || null;
-      } catch { _limpar(); return null; }
-    }
+      /* ── Quota ────────────────────────────────────────────────────────── */
+      let _qId = 0;
 
-    /* ── Quota ────────────────────────────────────────────────────────── */
-    let _qId = 0;
-
-    function _atualizarQuota(quota) {
-      const badge = document.getElementById("quotaBadge");
-      const txt   = document.getElementById("quotaText");
-      if (!badge || !txt) return;
-      if (!quota) { badge.hidden = true; return; }
-      txt.textContent = `${quota.used_today || 0} / ${quota.daily_limit || 0} previsões hoje`;
-      badge.hidden    = false;
-      badge.classList.toggle("quota-badge--full", !!quota.limit_reached);
-      if (quota.limit_reached) _mostrarBannerLimite(quota);
-      else { const b = document.getElementById("quotaLimitBanner"); if (b) b.hidden = true; }
-    }
-
-    function _mostrarBannerLimite(quota) {
-      const banner  = document.getElementById("quotaLimitBanner");
-      const titulo  = document.getElementById("quotaLimitTitulo");
-      const texto   = document.getElementById("quotaLimitTexto");
-      const ctaL    = document.getElementById("quotaCtaLogin");
-      const ctaR    = document.getElementById("quotaCtaRegister");
-      if (!banner) return;
-      banner.hidden = false;
-      if (quota && quota.is_authenticated) {
-        titulo.textContent = "Limite diário atingido";
-        texto.textContent  = "Você atingiu seu limite de 10 previsões hoje. Volte amanhã.";
-        if (ctaL) ctaL.hidden = true;
-        if (ctaR) ctaR.hidden = true;
-      } else {
-        titulo.textContent = "Você atingiu o limite gratuito de 2 previsões";
-        texto.textContent  = "Crie uma conta gratuita e libere até 10 avaliações por dia, com histórico salvo, favoritos e exportação.";
-        if (ctaL) ctaL.hidden = false;
-        if (ctaR) ctaR.hidden = false;
-      }
-    }
-
-    async function _refrescarQuota() {
-      const myId = ++_qId;
-      try {
-        const r = await _authFetch(`${_API}/v1/quota`, { method: "GET" }, false);
-        if (myId !== _qId || !r.ok) return;
-        const d = await r.json();
-        if (myId !== _qId) return;
-        _atualizarQuota(d);
-      } catch (_) {}
-    }
-
-    /* ── Erro ─────────────────────────────────────────────────────────── */
-    function _exibirErro(msg, critico = false) {
-      const el  = document.getElementById("mensagemErro");
-      const txt = document.getElementById("textoErro");
-      txt.textContent = msg;
-      el.classList.add("visivel");
-      if (critico) el.classList.add("critico"); else el.classList.remove("critico");
-      if (_exibirErro._t) clearTimeout(_exibirErro._t);
-      _exibirErro._t = setTimeout(() => el.classList.remove("visivel", "critico"), critico ? 12000 : 5000);
-    }
-    function _ocultarErro() {
-      document.getElementById("mensagemErro").classList.remove("visivel");
-    }
-
-    /* ── Validação / coleta ───────────────────────────────────────────── */
-    function _validarCampos() {
-      const nome = document.getElementById("nome_predio").value.trim();
-      const area = document.getElementById("area_util").value;
-      const cond = document.getElementById("valor_condominio").value;
-      const qts  = document.getElementById("quartos").value;
-      const vgs  = document.getElementById("vagas").value;
-      if (!nome || nome.length < 5) { _exibirErro("Informe o nome do condomínio ou endereço (mín. 5 caracteres)."); return false; }
-      if (!area || area <= 0)       { _exibirErro("Informe a área útil do imóvel (m²)."); return false; }
-      if (!cond || cond <= 0)       { _exibirErro("Informe o valor do condomínio mensal."); return false; }
-      if (!qts  || qts  < 0)       { _exibirErro("Informe a quantidade de quartos."); return false; }
-      if (!vgs  || vgs  < 0)       { _exibirErro("Informe a quantidade de vagas."); return false; }
-      return true;
-    }
-
-    function _coletarDados() {
-      return {
-        dados: {
-          Nome_Predio:      document.getElementById("nome_predio").value.trim(),
-          Area_Util:        parseFloat(document.getElementById("area_util").value),
-          Valor_Condominio: parseFloat(document.getElementById("valor_condominio").value),
-          Quartos:          parseInt(document.getElementById("quartos").value),
-          Vagas:            parseInt(document.getElementById("vagas").value),
-        },
-        areaUtil: parseFloat(document.getElementById("area_util").value),
-      };
-    }
-
-    /* ── Gráfico ──────────────────────────────────────────────────────── */
-    var _grafico = null;
-
-    function _renderizarGrafico(precoSugM2) {
-      const ctx   = document.getElementById("graficoTendencia").getContext("2d");
-      const meses = ["Set/25","Out/25","Nov/25","Dez/25","Jan/26","Fev/26","Mar/26"];
-      const fats  = [0.96, 0.98, 0.99, 1.01, 1.02, 1.01, 1.0];
-      const dados = fats.map(f => Math.round(precoSugM2 * f));
-      const media = dados.map(v => Math.round(v * 0.93));
-
-      if (_grafico) _grafico.destroy();
-      _grafico = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: meses,
-          datasets: [
-            {
-              label: "Este imóvel",
-              data: dados,
-              borderColor: "#2d7dd2",
-              backgroundColor: "rgba(45,125,210,0.07)",
-              borderWidth: 2.5,
-              pointBackgroundColor: "#2d7dd2",
-              pointBorderColor: "#fff",
-              pointBorderWidth: 2,
-              pointRadius: 5,
-              pointHoverRadius: 7,
-              fill: true,
-              tension: 0.4,
-            },
-            {
-              label: "Média do bairro",
-              data: media,
-              borderColor: "#94a3b8",
-              backgroundColor: "transparent",
-              borderWidth: 1.5,
-              borderDash: [6, 4],
-              pointRadius: 3,
-              pointHoverRadius: 5,
-              fill: false,
-              tension: 0.4,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: "#0a1628",
-              titleColor: "#94a3b8",
-              bodyColor: "#fff",
-              padding: 12,
-              cornerRadius: 8,
-              callbacks: {
-                label: c => ` R$ ${new Intl.NumberFormat("pt-BR").format(c.parsed.y)}/m²`,
-              },
-            },
-          },
-          scales: {
-            y: {
-              grid: { color: "#f1f5f9" },
-              ticks: {
-                color: "#94a3b8",
-                font: { family: "Inter", size: 11 },
-                callback: v => "R$ " + new Intl.NumberFormat("pt-BR").format(v),
-              },
-            },
-            x: {
-              grid: { display: false },
-              ticks: { color: "#94a3b8", font: { family: "Inter", size: 11 } },
-            },
-          },
-        },
-      });
-    }
-
-    /* ── Exibir resultado ─────────────────────────────────────────────── */
-    function _exibirResultado(precoMin, precoSug, precoMax, areaUtil, local) {
-      const fmt = v => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
-
-      document.getElementById("valorTotalMin").textContent = fmt(precoMin * areaUtil);
-      document.getElementById("valorTotalSug").textContent = fmt(precoSug * areaUtil);
-      document.getElementById("valorTotalMax").textContent = fmt(precoMax * areaUtil);
-
-      document.getElementById("metro_nome").textContent    = local.metro_nome || "—";
-      document.getElementById("loc_distancia").textContent = Number(local.Distancia_Metro_km).toFixed(2);
-      document.getElementById("loc_mercados").textContent  = local.Mercados_500m;
-      document.getElementById("loc_escolas").textContent   = local.Escolas_1000m;
-      document.getElementById("loc_parques").textContent   = local.Parques_800m;
-
-      try {
-        const mapa = document.getElementById("mapa_iframe");
-        const lat = Number(local.Latitude), lon = Number(local.Longitude);
-        if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
-          const d = 0.008;
-          mapa.src = `https://www.openstreetmap.org/export/embed.html?bbox=${lon-d},${lat-d},${lon+d},${lat+d}&layer=mapnik&marker=${lat},${lon}`;
-        } else { mapa.src = ""; }
-      } catch (_) {}
-
-      document.getElementById("results-empty").style.display = "none";
-      document.getElementById("price-cards").style.display   = "";
-      document.getElementById("dash-map-row").style.display  = "";
-      document.getElementById("chart-panel").style.display   = "";
-      document.getElementById("resultado").classList.add("visivel");
-      document.getElementById("resultado").scrollIntoView({ behavior: "smooth", block: "start" });
-      _renderizarGrafico(precoSug);
-    }
-
-    /* ── Calcular valor ───────────────────────────────────────────────── */
-    async function _calcularValor() {
-      const btn = document.getElementById("btnCalcular");
-      const textoOrig = btn ? btn.textContent : "Calcular valor de mercado";
-      try {
-        if (!_validarCampos()) return;
-        _ocultarErro();
-        if (btn) { btn.disabled = true; btn.textContent = "Calculando…"; }
-
-        const { dados, areaUtil } = _coletarDados();
-        const r = await _authFetch(`${_API}/v1/prever`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify(dados),
-        });
-
-        if (r.status === 403) { _limpar(); location.href = "/"; return; }
-
-        if (r.status === 429) {
-          let qi = null;
-          try { const d = await r.json(); qi = d && d.detail && d.detail.quota ? d.detail.quota : null; } catch (_) {}
-          _atualizarQuota(qi);
-          _mostrarBannerLimite(qi);
+      function _atualizarQuota(quota) {
+        const badge = document.getElementById("quotaBadge");
+        const txt = document.getElementById("quotaText");
+        if (!badge || !txt) return;
+        if (!quota) {
+          badge.hidden = true;
           return;
         }
-
-        if (!r.ok) {
-          const e = await r.json().catch(() => ({}));
-          throw new Error(e.detail || `Erro HTTP: ${r.status}`);
+        txt.textContent = `${quota.used_today || 0} / ${quota.daily_limit || 0} previsões hoje`;
+        badge.hidden = false;
+        badge.classList.toggle("quota-badge--full", !!quota.limit_reached);
+        if (quota.limit_reached) _mostrarBannerLimite(quota);
+        else {
+          const b = document.getElementById("quotaLimitBanner");
+          if (b) b.hidden = true;
         }
+      }
 
-        const res = await r.json();
-        if (res && res.quota) _atualizarQuota(res.quota);
-        if (!res.preco_m2_sugerido) throw new Error("API retornou dados incompletos");
+      function _mostrarBannerLimite(quota) {
+        const banner = document.getElementById("quotaLimitBanner");
+        const titulo = document.getElementById("quotaLimitTitulo");
+        const texto = document.getElementById("quotaLimitTexto");
+        const ctaL = document.getElementById("quotaCtaLogin");
+        const ctaR = document.getElementById("quotaCtaRegister");
+        if (!banner) return;
+        banner.hidden = false;
+        if (quota && quota.is_authenticated) {
+          titulo.textContent = "Limite diário atingido";
+          texto.textContent =
+            "Você atingiu seu limite de 10 previsões hoje. Volte amanhã.";
+          if (ctaL) ctaL.hidden = true;
+          if (ctaR) ctaR.hidden = true;
+        } else {
+          titulo.textContent = "Você atingiu o limite gratuito de 2 previsões";
+          texto.textContent =
+            "Crie uma conta gratuita e libere até 10 avaliações por dia, com histórico salvo, favoritos e exportação.";
+          if (ctaL) ctaL.hidden = false;
+          if (ctaR) ctaR.hidden = false;
+        }
+      }
 
-        _exibirResultado(
-          Number(res.preco_m2_minimo),
-          Number(res.preco_m2_sugerido),
-          Number(res.preco_m2_maximo),
-          areaUtil,
-          {
-            Distancia_Metro_km: res.Distancia_Metro_km,
-            metro_nome:         res.metro_nome,
-            Mercados_500m:      res.Mercados_500m,
-            Escolas_1000m:      res.Escolas_1000m,
-            Parques_800m:       res.Parques_800m,
-            Latitude:           res.Latitude,
-            Longitude:          res.Longitude,
+      async function _refrescarQuota() {
+        const myId = ++_qId;
+        try {
+          const r = await _authFetch(
+            `${_API}/v1/quota`,
+            { method: "GET" },
+            false,
+          );
+          if (myId !== _qId || !r.ok) return;
+          const d = await r.json();
+          if (myId !== _qId) return;
+          _atualizarQuota(d);
+        } catch (_) {}
+      }
+
+      /* ── Erro ─────────────────────────────────────────────────────────── */
+      function _exibirErro(msg, critico = false) {
+        const el = document.getElementById("mensagemErro");
+        const txt = document.getElementById("textoErro");
+        txt.textContent = msg;
+        el.classList.add("visivel");
+        if (critico) el.classList.add("critico");
+        else el.classList.remove("critico");
+        if (_exibirErro._t) clearTimeout(_exibirErro._t);
+        _exibirErro._t = setTimeout(
+          () => el.classList.remove("visivel", "critico"),
+          critico ? 12000 : 5000,
+        );
+      }
+      function _ocultarErro() {
+        document.getElementById("mensagemErro").classList.remove("visivel");
+      }
+
+      /* ── Validação / coleta ───────────────────────────────────────────── */
+      function _validarCampos() {
+        const nome = document.getElementById("nome_predio").value.trim();
+        const area = document.getElementById("area_util").value;
+        const cond = document.getElementById("valor_condominio").value;
+        const qts = document.getElementById("quartos").value;
+        const vgs = document.getElementById("vagas").value;
+        if (!nome || nome.length < 5) {
+          _exibirErro(
+            "Informe o nome do condomínio ou endereço (mín. 5 caracteres).",
+          );
+          return false;
+        }
+        if (!area || area <= 0) {
+          _exibirErro("Informe a área útil do imóvel (m²).");
+          return false;
+        }
+        if (!cond || cond <= 0) {
+          _exibirErro("Informe o valor do condomínio mensal.");
+          return false;
+        }
+        if (!qts || qts < 0) {
+          _exibirErro("Informe a quantidade de quartos.");
+          return false;
+        }
+        if (!vgs || vgs < 0) {
+          _exibirErro("Informe a quantidade de vagas.");
+          return false;
+        }
+        return true;
+      }
+
+      function _coletarDados() {
+        return {
+          dados: {
+            Nome_Predio: document.getElementById("nome_predio").value.trim(),
+            Area_Util: parseFloat(document.getElementById("area_util").value),
+            Valor_Condominio: parseFloat(
+              document.getElementById("valor_condominio").value,
+            ),
+            Quartos: parseInt(document.getElementById("quartos").value),
+            Vagas: parseInt(document.getElementById("vagas").value),
+          },
+          areaUtil: parseFloat(document.getElementById("area_util").value),
+        };
+      }
+
+      /* ── Gráfico ──────────────────────────────────────────────────────── */
+      var _grafico = null;
+
+      function _renderizarGrafico(precoSugM2) {
+        const ctx = document
+          .getElementById("graficoTendencia")
+          .getContext("2d");
+        const meses = [
+          "Set/25",
+          "Out/25",
+          "Nov/25",
+          "Dez/25",
+          "Jan/26",
+          "Fev/26",
+          "Mar/26",
+        ];
+        const fats = [0.96, 0.98, 0.99, 1.01, 1.02, 1.01, 1.0];
+        const dados = fats.map((f) => Math.round(precoSugM2 * f));
+        const media = dados.map((v) => Math.round(v * 0.93));
+
+        if (_grafico) _grafico.destroy();
+        _grafico = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: meses,
+            datasets: [
+              {
+                label: "Este imóvel",
+                data: dados,
+                borderColor: "#2d7dd2",
+                backgroundColor: "rgba(45,125,210,0.07)",
+                borderWidth: 2.5,
+                pointBackgroundColor: "#2d7dd2",
+                pointBorderColor: "#fff",
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                fill: true,
+                tension: 0.4,
+              },
+              {
+                label: "Média do bairro",
+                data: media,
+                borderColor: "#94a3b8",
+                backgroundColor: "transparent",
+                borderWidth: 1.5,
+                borderDash: [6, 4],
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                fill: false,
+                tension: 0.4,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: "#0a1628",
+                titleColor: "#94a3b8",
+                bodyColor: "#fff",
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                  label: (c) =>
+                    ` R$ ${new Intl.NumberFormat("pt-BR").format(c.parsed.y)}/m²`,
+                },
+              },
+            },
+            scales: {
+              y: {
+                grid: { color: "#f1f5f9" },
+                ticks: {
+                  color: "#94a3b8",
+                  font: { family: "Inter", size: 11 },
+                  callback: (v) =>
+                    "R$ " + new Intl.NumberFormat("pt-BR").format(v),
+                },
+              },
+              x: {
+                grid: { display: false },
+                ticks: {
+                  color: "#94a3b8",
+                  font: { family: "Inter", size: 11 },
+                },
+              },
+            },
+          },
+        });
+      }
+
+      /* ── Exibir resultado ─────────────────────────────────────────────── */
+      function _exibirResultado(precoMin, precoSug, precoMax, areaUtil, local) {
+        const fmt = (v) =>
+          new Intl.NumberFormat("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+          }).format(v);
+
+        document.getElementById("valorTotalMin").textContent = fmt(
+          precoMin * areaUtil,
+        );
+        document.getElementById("valorTotalSug").textContent = fmt(
+          precoSug * areaUtil,
+        );
+        document.getElementById("valorTotalMax").textContent = fmt(
+          precoMax * areaUtil,
+        );
+
+        document.getElementById("metro_nome").textContent =
+          local.metro_nome || "—";
+        document.getElementById("loc_distancia").textContent = Number(
+          local.Distancia_Metro_km,
+        ).toFixed(2);
+        document.getElementById("loc_mercados").textContent =
+          local.Mercados_500m;
+        document.getElementById("loc_escolas").textContent =
+          local.Escolas_1000m;
+        document.getElementById("loc_parques").textContent = local.Parques_800m;
+
+        try {
+          const mapa = document.getElementById("mapa_iframe");
+          const lat = Number(local.Latitude),
+            lon = Number(local.Longitude);
+          if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+            const d = 0.008;
+            mapa.src = `https://www.openstreetmap.org/export/embed.html?bbox=${lon - d},${lat - d},${lon + d},${lat + d}&layer=mapnik&marker=${lat},${lon}`;
+          } else {
+            mapa.src = "";
           }
-        );
-      } catch (e) {
-        _exibirErro(
-          e instanceof TypeError
-            ? "Não consigo conectar com o servidor. Verifique se a API está rodando."
-            : `❌ ${e.message}`,
-          e instanceof TypeError
-        );
-      } finally {
-        if (btn) { btn.disabled = false; btn.textContent = textoOrig; }
-      }
-    }
+        } catch (_) {}
 
-    /* ── Bootstrap ────────────────────────────────────────────────────── */
-    window.addEventListener('popstate', function() {
-      window.location.href = '/';
-    });
-
-    document.addEventListener("DOMContentLoaded", async () => {
-      const usuario = await _restaurarSessao();
-      _atualizarHeader(usuario);
-      _refrescarQuota();
-
-      document.getElementById("formularioImovel").addEventListener("submit", e => {
-        e.preventDefault();
-        _calcularValor();
-      });
-
-      document.getElementById("btnLimpar").addEventListener("click", () => {
-        document.getElementById("formularioImovel").reset();
-        document.getElementById("results-empty").style.display = "";
-        document.getElementById("price-cards").style.display   = "none";
-        document.getElementById("dash-map-row").style.display  = "none";
-        document.getElementById("chart-panel").style.display   = "none";
-        document.getElementById("mapa_iframe").src             = "";
-        document.getElementById("resultado").classList.remove("visivel");
-        _ocultarErro();
-      });
-
-      document.querySelectorAll("input, select").forEach(el =>
-        el.addEventListener("focus", _ocultarErro)
-      );
-
-      // Dropdown do card de usuário
-      const _userBox  = document.getElementById("dashUser");
-      const _userMenu = document.getElementById("dashUserMenu");
-      if (_userBox && _userMenu) {
-        _userBox.addEventListener("click", (e) => {
-          if (e.target.closest("#dashUserMenu")) return;
-          _userMenu.hidden = !_userMenu.hidden;
-        });
-        document.addEventListener("click", (e) => {
-          if (!_userBox.contains(e.target)) _userMenu.hidden = true;
-        });
+        document.getElementById("results-empty").style.display = "none";
+        document.getElementById("price-cards").style.display = "";
+        document.getElementById("dash-map-row").style.display = "";
+        document.getElementById("chart-panel").style.display = "";
+        document.getElementById("resultado").classList.add("visivel");
+        document
+          .getElementById("resultado")
+          .scrollIntoView({ behavior: "smooth", block: "start" });
+        _renderizarGrafico(precoSug);
       }
 
-      document.getElementById("btn-logout").addEventListener("click", async () => {
-        const rt = _getRt();
-        if (rt) {
-          try {
-            await fetch(`${_API}/v1/auth/logout`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ refresh_token: rt }),
-            });
-          } catch (_) {}
+      /* ── Calcular valor ───────────────────────────────────────────────── */
+      async function _calcularValor() {
+        const btn = document.getElementById("btnCalcular");
+        const textoOrig = btn ? btn.textContent : "Calcular valor de mercado";
+        try {
+          if (!_validarCampos()) return;
+          _ocultarErro();
+          if (btn) {
+            btn.disabled = true;
+            btn.textContent = "Calculando…";
+          }
+
+          const { dados, areaUtil } = _coletarDados();
+          const r = await _authFetch(`${_API}/v1/prever`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify(dados),
+          });
+
+          if (r.status === 403) {
+            _limpar();
+            location.href = "/";
+            return;
+          }
+
+          if (r.status === 429) {
+            let qi = null;
+            try {
+              const d = await r.json();
+              qi = d && d.detail && d.detail.quota ? d.detail.quota : null;
+            } catch (_) {}
+            _atualizarQuota(qi);
+            _mostrarBannerLimite(qi);
+            return;
+          }
+
+          if (!r.ok) {
+            const e = await r.json().catch(() => ({}));
+            throw new Error(e.detail || `Erro HTTP: ${r.status}`);
+          }
+
+          const res = await r.json();
+          if (res && res.quota) _atualizarQuota(res.quota);
+          if (!res.preco_m2_sugerido)
+            throw new Error("API retornou dados incompletos");
+
+          _exibirResultado(
+            Number(res.preco_m2_minimo),
+            Number(res.preco_m2_sugerido),
+            Number(res.preco_m2_maximo),
+            areaUtil,
+            {
+              Distancia_Metro_km: res.Distancia_Metro_km,
+              metro_nome: res.metro_nome,
+              Mercados_500m: res.Mercados_500m,
+              Escolas_1000m: res.Escolas_1000m,
+              Parques_800m: res.Parques_800m,
+              Latitude: res.Latitude,
+              Longitude: res.Longitude,
+            },
+          );
+        } catch (e) {
+          _exibirErro(
+            e instanceof TypeError
+              ? "Não consigo conectar com o servidor. Verifique se a API está rodando."
+              : `❌ ${e.message}`,
+            e instanceof TypeError,
+          );
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = textoOrig;
+          }
         }
-        _limpar();
-        location.href = "/";
+      }
+
+      /* ── Bootstrap ────────────────────────────────────────────────────── */
+      window.addEventListener("popstate", function () {
+        window.location.href = "/";
       });
 
-      const ctaLogin = document.getElementById("quotaCtaLogin");
-      if (ctaLogin) ctaLogin.addEventListener("click", () => { location.href = "/"; });
-      const ctaReg = document.getElementById("quotaCtaRegister");
-      if (ctaReg) ctaReg.addEventListener("click", () => { location.href = "/"; });
-    });
-  </script>
-</body>
+      document.addEventListener("DOMContentLoaded", async () => {
+        const usuario = await _restaurarSessao();
+        _atualizarHeader(usuario);
+        _refrescarQuota();
+
+        document
+          .getElementById("formularioImovel")
+          .addEventListener("submit", (e) => {
+            e.preventDefault();
+            _calcularValor();
+          });
+
+        document.getElementById("btnLimpar").addEventListener("click", () => {
+          document.getElementById("formularioImovel").reset();
+          document.getElementById("results-empty").style.display = "";
+          document.getElementById("price-cards").style.display = "none";
+          document.getElementById("dash-map-row").style.display = "none";
+          document.getElementById("chart-panel").style.display = "none";
+          document.getElementById("mapa_iframe").src = "";
+          document.getElementById("resultado").classList.remove("visivel");
+          _ocultarErro();
+        });
+
+        document
+          .querySelectorAll("input, select")
+          .forEach((el) => el.addEventListener("focus", _ocultarErro));
+
+        // Dropdown do card de usuário
+        const _userBox = document.getElementById("dashUser");
+        const _userMenu = document.getElementById("dashUserMenu");
+        if (_userBox && _userMenu) {
+          _userBox.addEventListener("click", (e) => {
+            if (e.target.closest("#dashUserMenu")) return;
+            _userMenu.hidden = !_userMenu.hidden;
+          });
+          document.addEventListener("click", (e) => {
+            if (!_userBox.contains(e.target)) _userMenu.hidden = true;
+          });
+        }
+
+        document
+          .getElementById("btn-logout")
+          .addEventListener("click", async () => {
+            const rt = _getRt();
+            if (rt) {
+              try {
+                await fetch(`${_API}/v1/auth/logout`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ refresh_token: rt }),
+                });
+              } catch (_) {}
+            }
+            _limpar();
+            location.href = "/";
+          });
+
+        const ctaLogin = document.getElementById("quotaCtaLogin");
+        if (ctaLogin)
+          ctaLogin.addEventListener("click", () => {
+            location.href = "/";
+          });
+        const ctaReg = document.getElementById("quotaCtaRegister");
+        if (ctaReg)
+          ctaReg.addEventListener("click", () => {
+            location.href = "/";
+          });
+      });
+    </script>
+  </body>
 </html>

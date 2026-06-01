@@ -31,66 +31,31 @@
     </div>
 
     <!-- ── Header ─────────────────────────────────────────────────────── -->
-    <header class="pg-header">
-      <div
-        class="pg-header__brand"
-        style="cursor: pointer"
-        onclick="window.location.href='/'"
-      >
-        <span class="nav__logo-icon" aria-hidden="true">◈</span>
-        <span>PrevIsmob</span>
-      </div>
-      <a
-        href="#"
-        onclick="event.preventDefault(); window.history.back();"
-        style="
-          cursor: pointer;
-          text-decoration: none;
-          color: var(--c-gray-500, #64748b);
-          font-size: var(--text-sm);
-        "
-        >← Histórico</a
-      >
-      <h1 class="pg-header__title">Comparação</h1>
-      <div class="pg-header__actions">
-        <button class="btn btn--outline btn--sm" id="btn-exp-csv">CSV</button>
-        <button class="btn btn--outline btn--sm" id="btn-exp-pdf">PDF</button>
-      </div>
-      <div
-        class="dash-user"
-        id="dashUser"
-        style="display: none; position: relative; cursor: pointer"
-        title=""
-      >
-        <span class="dash-user__avatar" aria-hidden="true">👤</span>
-        <span class="dash-user__info">
-          <strong id="dashUserNome">—</strong>
-          <small id="dashUserEmail">—</small>
-        </span>
-        <div
-          class="dash-user__menu"
-          id="dashUserMenu"
-          hidden
-          style="
-            position: absolute;
-            top: calc(100% + 8px);
-            right: 0;
-            z-index: 900;
-            background: var(--c-white);
-            border: 1px solid var(--c-gray-200);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-md);
-            padding: var(--sp-2);
-            min-width: 120px;
-          "
-        >
-          <button
-            class="btn btn--outline btn--sm btn--full"
-            id="btn-logout"
-            type="button"
-          >
-            Sair
-          </button>
+    <header class="dash-header">
+      <div class="dash-header__inner">
+        <button class="btn btn--ghost btn--sm" onclick="window.history.back()">← Voltar</button>
+        <div class="dash-header__brand" style="cursor:pointer" onclick="window.location.href='/'">
+          <span class="nav__logo-icon" aria-hidden="true">◈</span>
+          <span>PrevIsmob</span>
+        </div>
+        <div class="dash-header__actions">
+          <span class="dash-header__tag">Comparação</span>
+          <button class="btn btn--outline btn--sm" id="btn-exp-csv">CSV</button>
+          <button class="btn btn--outline btn--sm" id="btn-exp-pdf">PDF</button>
+          <div class="dash-user" id="dashUser" style="display:none; position:relative; cursor:pointer" title="">
+            <span class="dash-user__avatar" aria-hidden="true">👤</span>
+            <span class="dash-user__info">
+              <strong id="dashUserNome">—</strong>
+              <small id="dashUserEmail">—</small>
+            </span>
+            <div class="dash-user__menu" id="dashUserMenu" hidden
+                 style="position:absolute; top:calc(100% + 8px); right:0; z-index:900;
+                        background:var(--c-white); border:1px solid var(--c-gray-200);
+                        border-radius:var(--radius); box-shadow:var(--shadow-md);
+                        padding:var(--sp-2); min-width:120px;">
+              <button class="btn btn--outline btn--sm btn--full" id="btn-logout" type="button">Sair</button>
+            </div>
+          </div>
         </div>
       </div>
     </header>
