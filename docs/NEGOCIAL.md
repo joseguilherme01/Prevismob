@@ -107,7 +107,7 @@ Métricas-âncora para os próximos 90 dias:
 | Verificação de e-mail concluída       | % de cadastros que confirmam e-mail             | ≥ 70%                            |
 | Retenção D7 (auth)                    | % de usuários autenticados que voltam em 7 dias | Faixa alvo: 25–35%               |
 | Avaliações por usuário auth/semana    | Frequência de uso                               | ≥ 3                              |
-| Uso de favoritos / comparação         | % de usuários auth que usam ao menos 1 vez      | ≥ 40%                            |
+| Uso de comparação                     | % de usuários auth que usam ao menos 1 vez      | ≥ 40%                            |
 | Exportações (CSV/PDF)                 | Sinal de uso profissional                       | Acompanhar como proxy de WTP     |
 | Custo médio por avaliação enriquecida | R$ de Google Maps + infra por previsão          | Definir teto antes de monetizar  |
 

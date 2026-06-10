@@ -31,7 +31,7 @@ Este plano descreve a estratégia de testes de caixa preta do PrevIsmob, realiza
 - Login com e-mail e senha
 - Login com Google
 - Acesso autenticado e cota de 10 previsões por dia
-- Página de histórico de avaliações com marcação de favoritos
+- Página de histórico de avaliações com seleção para comparação
 - Seleção de 2 avaliações e comparação lado a lado com gráfico
 - Exportação de relatório em CSV e PDF
 - Navegação entre páginas e botão de voltar

@@ -50,7 +50,6 @@ Casos de uso típicos:
 - **Cadastro + login** com verificação obrigatória de e-mail (JWT access + refresh).
 - **Login social com Google OAuth 2.0** (Google Identity Services; verificação do ID Token server-side).
 - **Histórico** de avaliações em página dedicada `/historico`.
-- **Favoritos** sobre avaliações do histórico.
 - **Comparar** 2 avaliações selecionadas no histórico lado a lado — página dedicada `/comparar` com gráfico radar.
 - **Exportação** de histórico em **CSV** e **PDF** (disponível em `/comparar`, suporta `?ids=ID1,ID2`).
 - **Cotas diárias** com feedback amigável (HTTP 429 + `Retry-After`).
@@ -170,7 +169,7 @@ Crie `.env` na raiz. Nunca commite segredos.
 2. Clicar no link de verificação → conta ativada.
 3. **Login** → cota sobe para **10/dia**.
 4. Fazer previsões em `/previsao`; histórico acessível em `/historico`.
-5. Marcar favoritos, comparar em `/comparar`, exportar **CSV/PDF**.
+5. Selecionar 2 avaliações no histórico, comparar em `/comparar`, exportar **CSV/PDF**.
 6. **Logout** volta para landing pública.
 
 ---
@@ -230,3 +229,9 @@ A definir.
 - [README_ARQUITETURA.md](README_ARQUITETURA.md) — arquitetura, fluxos e decisões técnicas.
 - [README_TESTES.md](README_TESTES.md) — estratégia, comandos e checklist de testes.
 - [CONTRIBUICOES.md](CONTRIBUICOES.md) — divisão de responsabilidades dos integrantes.
+- [docs/PLANO_TESTE_CAIXA_BRANCA.md](docs/PLANO_TESTE_CAIXA_BRANCA.md) — plano de testes automatizados (IEEE 829/ISTQB).
+- [docs/EXECUCAO_TESTES_CAIXA_BRANCA.md](docs/EXECUCAO_TESTES_CAIXA_BRANCA.md) — relatório de execução dos 44 casos de teste automatizados.
+- [docs/PLANO_TESTE_CAIXA_PRETA.md](docs/PLANO_TESTE_CAIXA_PRETA.md) — plano de testes manuais de caixa preta.
+- [docs/EXECUCAO_TESTES_CAIXA_PRETA.md](docs/EXECUCAO_TESTES_CAIXA_PRETA.md) — relatório de execução dos 29 casos de teste manuais.
+- [docs/NEGOCIAL.md](docs/NEGOCIAL.md) — análise de negócio, personas e métricas de produto.
+- [docs/fluxo_prevismob.md](docs/fluxo_prevismob.md) — diagrama de fluxo do sistema.

@@ -177,7 +177,6 @@ Rodar localmente (`uvicorn api:app --reload`).
 - [ ] Badge de cota muda para `0/10` (ou valor atual) imediatamente após login.
 - [ ] Página `/historico` exibe avaliações anteriores.
 - [ ] Histórico não é acessível sem autenticação (redireciona para landing).
-- [ ] Favoritar/desfavoritar persiste após reload.
 - [ ] Comparar 2 avaliações em `/comparar` renderiza gráfico radar lado a lado.
 - [ ] Exportar CSV baixa arquivo válido.
 - [ ] Exportar PDF baixa arquivo válido.
