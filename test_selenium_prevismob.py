@@ -2,7 +2,7 @@
 Testes de Caixa Preta Automatizados — PrevIsmob (v3 - completo)
 Ferramenta: Selenium WebDriver + pytest
 
-Cobre 23 casos do plano de teste de caixa preta:
+Cobre 24 casos do plano de teste de caixa preta:
   Grupo 1 (Visitante):    CT-001, CT-002, CT-003, CT-004, CT-005, CT-006, CT-007
   Grupo 2 (Cadastro):     CT-008, CT-009, CT-010, CT-011, CT-012
   Grupo 3 (Login/Cota):   CT-013, CT-014, CT-016, CT-018, CT-029
@@ -16,7 +16,6 @@ NÃO COBERTOS (por decisão de projeto):
   CT-020 — Inválido (sistema só permite comparar com 2 selecionados)
   CT-024 — Export CSV (requer interceptar download)
   CT-025 — Export PDF (requer interceptar download)
-  Favoritos — funcionalidade removida do sistema
 
 PRÉ-REQUISITOS:
     pip install selenium pytest
@@ -27,6 +26,8 @@ ATENÇÃO:
   • CT-011 cria uma conta nova no banco (e-mail com timestamp único)
   • A cota de visitante (CT-003/004/005) precisa rodar em sequência
   • CT-016 faz só 3 previsões para confirmar o mecanismo de contagem
+
+Nota: a funcionalidade de favoritos foi descontinuada e não corresponde a nenhum CT do plano (CT-001 a CT-029); citada aqui apenas para contexto histórico.
 """
 
 import time

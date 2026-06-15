@@ -68,12 +68,11 @@ Os itens a seguir são as funcionalidades testáveis identificadas a partir do c
 | F-13 | Retorno HTTP 429 ao exceder cota, com `Retry-After`  | `POST /v1/prever`    |
 | F-14 | Autocomplete de nomes de condomínios (dataset CSV)   | `GET /v1/condominio` |
 
-### 3.3 Histórico, Favoritos e Comparação
+### 3.3 Histórico e Comparação
 
 | ID   | Funcionalidade                                 | Módulo/Rota               |
 | ---- | ---------------------------------------------- | ------------------------- |
 | F-15 | Listagem do histórico de avaliações do usuário | `GET /v1/historico`       |
-| F-16 | Toggle de favorito sobre uma avaliação         | `POST /v1/favoritos/{id}` |
 | F-17 | Comparação de avaliações por IDs (`?ids=`)     | `GET /v1/comparar`        |
 | F-18 | Exportação do histórico em CSV                 | `GET /v1/export/csv`      |
 | F-19 | Exportação do histórico em PDF                 | `GET /v1/export/pdf`      |
@@ -94,7 +93,7 @@ Os itens a seguir são as funcionalidades testáveis identificadas a partir do c
 | ---- | ------------------------------------------------------------ | ---------------- |
 | F-25 | Página de landing pública                                    | `index.html`     |
 | F-26 | Página de previsão                                           | `previsao.html`  |
-| F-27 | Página de histórico com favoritos                            | `historico.html` |
+| F-27 | Página de histórico                                          | `historico.html` |
 | F-28 | Página de comparação com gráfico radar + exportação          | `comparar.html`  |
 | F-29 | Botão de voltar do browser retorna à landing                 | `previsao.html`  |
 | F-30 | Fluxo pós-login por intenção (`next=app` vs. `next=landing`) | `script.js`      |
@@ -124,6 +123,7 @@ Os itens abaixo existem no produto mas não são cobertos pelos testes automatiz
 | Rotação de refresh token (`/v1/auth/refresh`)       | Fluxo não coberto em testes automatizados desta iteração.                                           |
 | Logout e revogação de sessão (`/v1/auth/logout`)    | Fluxo não coberto em testes automatizados desta iteração.                                           |
 | Banco de dados MySQL real                           | Todos os testes usam `FakeDB` em memória; o banco real não é exercitado.                            |
+| Toggle de favorito sobre uma avaliação (`POST /v1/favoritos/{id}`) — F-16 | Funcionalidade de favoritos descontinuada na UI; endpoint e colunas relacionadas mantidos no backend como legado (ver README_ARQUITETURA.md, seção Segurança → Pendências). Não testado por não fazer parte da experiência atual do usuário. |
 
 ---
 

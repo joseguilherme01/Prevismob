@@ -11,7 +11,7 @@
 | **Data**        | 27/05/2026                                                                 |
 | **Projeto**     | PrevIsmob — Plataforma de Avaliação de Imóveis                             |
 | **Responsável**           | Eduardo Borges de Carvalho (Qualidade e Testes)                             |
-| **Execução automatizada** | Selenium WebDriver + pytest (`test_selenium_prevismob.py`) — 23 de 29 casos |
+| **Execução automatizada** | Selenium WebDriver + pytest (`test_selenium_prevismob.py`) — 24 de 29 casos |
 
 ---
 
@@ -27,7 +27,7 @@ Registrar a execução manual dos testes de caixa preta realizados no sistema Pr
 - Casos de teste definidos manualmente com base nas funcionalidades da interface
 - Sistema PrevIsmob rodando em `http://127.0.0.1:8000`
 - Conta de teste criada previamente para os cenários autenticados
-- `test_selenium_prevismob.py` — suite de testes automatizados Selenium WebDriver + pytest (cobre 23 de 29 casos)
+- `test_selenium_prevismob.py` — suite de testes automatizados Selenium WebDriver + pytest (cobre 24 de 29 casos)
 - Pré-requisito de execução automatizada: `pip install selenium pytest`, sistema rodando via `uvicorn api:app --reload`, conta de teste com e-mail já verificado no banco
 
 ---
@@ -109,7 +109,7 @@ Registrar a execução manual dos testes de caixa preta realizados no sistema Pr
 | **Ferramenta**            | Google Chrome (execução manual) + Selenium WebDriver + pytest (execução automatizada)                        |
 | **Ambiente**              | `http://127.0.0.1:8000`                                                                                       |
 | **Execução automatizada** | `pytest test_selenium_prevismob.py -v`                                                                        |
-| **Critério de execução**  | Execução manual original + 23 casos automatizados via Selenium WebDriver + pytest                             |
+| **Critério de execução**  | Execução manual original + 24 casos automatizados via Selenium WebDriver + pytest                             |
 
 ---
 
@@ -183,8 +183,8 @@ Registrar a execução manual dos testes de caixa preta realizados no sistema Pr
 | Não executados                         | 0     |
 | Taxa de aprovação                      | 100%  |
 | Defeitos encontrados                   | 0     |
-| Automatizados (Selenium)               | 23    |
-| Não automatizados (decisão de projeto) | 6     |
+| Automatizados (Selenium)               | 24    |
+| Não automatizados (decisão de projeto) | 5     |
 
 ### Resumo por Grupo
 
@@ -203,7 +203,7 @@ Registrar a execução manual dos testes de caixa preta realizados no sistema Pr
 
 Os 29 casos de teste de caixa preta foram executados com sucesso, atingindo 100% de aprovação. Todos os fluxos críticos do sistema — cadastro, verificação de e-mail, login, controle de cotas, histórico, comparação e exportação — funcionaram conforme o esperado durante a execução na interface web. Nenhum defeito foi registrado.
 
-Dos 29 casos, 23 foram automatizados via Selenium WebDriver + pytest (`test_selenium_prevismob.py`). Os 6 casos restantes não foram automatizados por decisão técnica documentada: CT-015 (Google OAuth não automatizável sem credenciais especiais), CT-017 (bloqueio de 11ª previsão já coberto pelos testes de caixa branca TC-024), CT-020 (selecionar apenas 1 avaliação não representa cenário de comparação válido pelo design do sistema), CT-024 e CT-025 (exportação CSV/PDF requer intercepção de download não coberta pela automação atual).
+Dos 29 casos, 24 foram automatizados via Selenium WebDriver + pytest (`test_selenium_prevismob.py`). Os 5 casos restantes não foram automatizados por decisão técnica documentada: CT-015 (Google OAuth não automatizável sem credenciais especiais), CT-017 (bloqueio de 11ª previsão já coberto pelos testes de caixa branca TC-024), CT-020 (selecionar apenas 1 avaliação não representa cenário de comparação válido pelo design do sistema), CT-024 e CT-025 (exportação CSV/PDF requer intercepção de download não coberta pela automação atual).
 
 Os itens não cobertos por esta campanha — como responsividade em dispositivos móveis, performance sob carga e validação do conteúdo interno dos arquivos exportados — representam oportunidades de melhoria para iterações futuras. Recomenda-se incluir testes de responsividade e de conteúdo de exportação nas próximas versões do plano de teste, especialmente antes de uma entrega em ambiente de produção.
 

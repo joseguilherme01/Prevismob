@@ -28,8 +28,8 @@ Documento técnico sobre a estrutura interna do PrevIsmob, fluxos de navegação
 
 - Separar **frontend estático** de **backend de domínio** para permitir deploy independente.
 - Concentrar regras de negócio (cotas, auth, persistência, modelagem) no backend, mantendo o frontend "burro" — apenas UI + chamadas REST.
-- Permitir uso público (guest) com fricção mínima e habilitar features ricas (histórico, favoritos, export) apenas após autenticação verificada.
-- Reaproveitar dados externos (Google Maps) por requisição, sem armazenar coordenadas estáticas no frontend.
+- Permitir uso público (guest) com fricção mínima e habilitar features ricas (histórico, comparação, export) apenas após autenticação verificada.
+- Cachear o enriquecimento geográfico (Google Maps) por condomínio com TTL de 90 dias (`caracteristicas_localizacao.expira_em`), reduzindo chamadas repetidas à API externa.
 
 ---
 
@@ -40,7 +40,7 @@ Documento técnico sobre a estrutura interna do PrevIsmob, fluxos de navegação
 │                                                                                 │
 │   index.html    ─►  landing + auth (login, cadastro, Google OAuth)              │
 │   previsao.html ─►  formulário de previsão + resultado                          │
-│   historico.html─►  histórico de avaliações + favoritos                         │
+│   historico.html─►  histórico de avaliações e comparação                        │
 │   comparar.html ─►  comparação lado a lado + exportação CSV/PDF                 │
 │   script.js     ─►  estado client-side compartilhado (auth, intent pós-login)   │
 │   style.css     ─►  tema único, mobile-first                                    │
@@ -54,7 +54,6 @@ Documento técnico sobre a estrutura interna do PrevIsmob, fluxos de navegação
 │   ├── /v1/prever           → orquestra Maps + ML + persistência + cota          │
 │   ├── /v1/quota            → estado atual da cota (guest/auth)                  │
 │   ├── /v1/historico        → lista avaliações do usuário                        │
-│   ├── /v1/favoritos/{id}   → toggle de favorito                                 │
 │   ├── /v1/comparar         → múltiplas avaliações lado a lado                   │
 │   ├── /v1/export/{csv,pdf} → exportação                                         │
 │   ├── /v1/condominio       → autocomplete (dataset CSV)                         │
@@ -87,7 +86,7 @@ Prevismob/
 ├── static/
 │   ├── index.html                 # Landing + autenticação (Google OAuth incluso)
 │   ├── previsao.html              # Formulário de previsão e resultado
-│   ├── historico.html             # Histórico, favoritos e navegação
+│   ├── historico.html             # Histórico e navegação
 │   ├── comparar.html              # Comparação lado a lado + exportação CSV/PDF
 │   ├── script.js                  # Estado client-side compartilhado
 │   └── style.css                  # Tema visual
@@ -111,17 +110,17 @@ O frontend é composto de **4 páginas HTML independentes**, servidas pelo próp
 
 - `index.html` — landing pública + autenticação (login, cadastro, Google OAuth).
 - `previsao.html` — formulário de previsão e resultado; aceita guest ou auth.
-- `historico.html` — histórico de avaliações, favoritos e links para comparação.
+- `historico.html` — histórico de avaliações e links para comparação.
 - `comparar.html` — comparação lado a lado de 2 avaliações + exportação CSV/PDF.
 
 `script.js` (compartilhado) gerencia apenas estado de auth e navegação na landing. Cada página tem seu próprio JS inline para operações de domínio. A landing (`/`) é sempre o ponto de entrada padrão.
 
 ### Guest vs. Auth
 
-| Estado | Identificação                                                          | Cota             | Recursos disponíveis                                   |
-| ------ | ---------------------------------------------------------------------- | ---------------- | ------------------------------------------------------ |
-| Guest  | Cookie `prevismob_guest_id` (UUID v4, httpOnly) ou fallback hash IP+UA | 2 previsões/dia  | `/v1/prever`, `/v1/quota`, `/v1/condominio`            |
-| Auth   | JWT Bearer (access 15min) + refresh (7d, hash em `sessoes`)            | 10 previsões/dia | Tudo do guest + histórico, favoritos, comparar, export |
+| Estado | Identificação                                                          | Cota             | Recursos disponíveis                        |
+| ------ | ---------------------------------------------------------------------- | ---------------- | ------------------------------------------- |
+| Guest  | Cookie `prevismob_guest_id` (UUID v4, httpOnly) ou fallback hash IP+UA | 2 previsões/dia  | `/v1/prever`, `/v1/quota`, `/v1/condominio` |
+| Auth   | JWT Bearer (access 15min) + refresh (7d, hash em `sessoes`)            | 10 previsões/dia | Tudo do guest + histórico, comparar, export |
 
 A landing detecta o estado pela presença/validade do access token e ajusta a navbar (`data-auth-state="guest|auth"`).
 
@@ -178,7 +177,6 @@ O login social usa **Google Identity Services** no frontend e verificação serv
 - Histórico acessível via página dedicada `/historico` (auth obrigatória). A landing não exibe dados pessoais.
 - Endpoint backing: `GET /v1/historico`.
 - Cada item permite:
-  - Marcar/desmarcar favorito → `POST /v1/favoritos/{avaliacao_id}` (toggle).
   - Selecionar para comparação → navega para `/comparar?ids=ID1,ID2`.
   - Exportar a lista visível em CSV/PDF → `GET /v1/export/csv` ou `/v1/export/pdf`.
 
@@ -218,7 +216,6 @@ O login social usa **Google Identity Services** no frontend e verificação serv
 | `POST`   | `/v1/prever`                    | Opcional (Bearer ou guest) | Previsão; consome cota; persiste em `avaliacoes` se DB disponível. |
 | `GET`    | `/v1/quota`                     | Opcional                   | Estado da cota (auth ou guest).                                    |
 | `GET`    | `/v1/historico`                 | Bearer                     | Avaliações do usuário corrente (JSON).                             |
-| `POST`   | `/v1/favoritos/{avaliacao_id}`  | Bearer                     | Toggle favorito.                                                   |
 | `GET`    | `/v1/comparar`                  | Bearer                     | Compara avaliações por IDs (JSON).                                 |
 | `GET`    | `/v1/export/csv`                | Bearer                     | Histórico em CSV.                                                  |
 | `GET`    | `/v1/export/pdf`                | Bearer                     | Histórico em PDF.                                                  |
@@ -325,7 +322,7 @@ erDiagram
 | `condominios`                 | Catálogo de empreendimentos avaliados. `chave_normalizada` (UNIQUE) viabiliza deduplicação determinística entre variações de digitação.                                                                                                                                                                                           |
 | `caracteristicas_localizacao` | Cache de enriquecimento geográfico (Google Maps) por condomínio. `fonte_dado` rastreia a procedência (`google`, `manual`, `importacao`) e `expira_em` permite invalidação programada do cache.                                                                                                                                    |
 | `modelos_ml`                  | Registro dos modelos de regressão disponíveis. A combinação (`nome_modelo`, `versao`) é única; `ativo` permite alternar versões sem remoção física do registro.                                                                                                                                                                   |
-| `avaliacoes`                  | Fato central da aplicação. Persiste cada previsão (entrada do usuário, faixas de preço estimadas, status, tempo de processamento) e dá suporte simultâneo a histórico, favoritos e contagem de cota.                                                                                                                              |
+| `avaliacoes`                  | Fato central da aplicação. Persiste cada previsão (entrada do usuário, faixas de preço estimadas, status, tempo de processamento) e dá suporte simultâneo a histórico e contagem de cota.                                                                                                                                         |
 | `avaliacoes_backup_20260425`  | Snapshot histórico da tabela `avaliacoes` anterior à migração de 25/04/2026 ([2026_04_25_quotas_favoritos.sql](migrations/2026_04_25_quotas_favoritos.sql)). Não possui chave primária nem FKs, não é lida pela aplicação e existe exclusivamente como salvaguarda de auditoria — pode ser descartada após validação em produção. |
 
 ### Relacionamentos (chaves estrangeiras)
@@ -364,6 +361,7 @@ Os índices abaixo, definidos em `CREATE TABLE`, sustentam consultas críticas d
 - O schema é parcialmente bootstrapado em runtime: as funções `_ensure_email_verification_columns` e `_ensure_quota_favoritos_columns` em `api.py` aplicam, de forma idempotente, as colunas e índices definidos em [migrations/](migrations/). As colunas `google_id` e `avatar_url` adicionadas por [2026_05_google_oauth.sql](migrations/2026_05_google_oauth.sql) devem ser aplicadas manualmente antes do primeiro deploy com Google OAuth. Alterações manuais nas tabelas envolvidas devem preservar essa idempotência.
 - Tipos `DATETIME` neste schema são _naive_ (sem timezone). O backend grava timestamps em UTC via `datetime.utcnow()`; a migração para colunas timezone-aware é um item de roadmap (ver [README_TESTES.md](README_TESTES.md#warnings-conhecidos-do-pytest)).
 - A política de `ON DELETE RESTRICT` significa que a exclusão de conta (`DELETE /auth/me`) **não remove** registros físicos: o fluxo realiza anonimização lógica em `usuarios` e revogação em `sessoes`, preservando integridade referencial com `avaliacoes`.
+- A coluna `is_favorita` e o índice `ix_avaliacoes_favoritas` existem no schema como legado. O endpoint `POST /v1/favoritos/{avaliacao_id}` permanece ativo na API, mas a funcionalidade não está exposta na interface web. Podem ser removidos em migração futura caso o endpoint seja descontinuado.
 
 ---
 
@@ -398,22 +396,22 @@ Alinhado a `docs/NEGOCIAL.md` H4:
 
 ## Decisões técnicas
 
-| Tema                  | Decisão                                                           | Trade-off                                                                                                                                                                                                                                               |
-| --------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Backend               | FastAPI + Pydantic v2                                             | Documentação automática, validação tipada; custo de adoção mínimo.                                                                                                                                                                                      |
-| ORM                   | SQLAlchemy 1.4 com SQL textual                                    | Controle fino sobre queries críticas; sem mapeamento ORM completo (menos abstração, mais SQL explícito).                                                                                                                                                |
-| Auth                  | JWT HS256 (access 15min) + refresh hash em DB                     | Refresh revogável; segredo único compartilhado (não suporta rotação multi-instância sem ajuste).                                                                                                                                                        |
-| Senhas                | bcrypt via `passlib` (`bcrypt==4.0.1` pinado)                     | `passlib 1.7.4` quebra com bcrypt ≥ 4.1; ver comentário em `requirements.txt`.                                                                                                                                                                          |
-| Verificação de e-mail | Token aleatório, **hash** persistido                              | Mesmo se o DB vazar, tokens não são reusáveis.                                                                                                                                                                                                          |
-| Cotas                 | Contagem em `avaliacoes` por dia                                  | Simples e auditável; depende de DB online (sem fallback in-memory).                                                                                                                                                                                     |
-| Guest tracking        | Cookie httpOnly `prevismob_guest_id` + fallback hash IP+UA        | Sem PII direto; fallback é "best effort" para clientes sem cookie.                                                                                                                                                                                      |
-| Migrações             | SQL idempotente em `migrations/` + bootstrap runtime em `api.py`  | Não exige Alembic; risco de divergência se alguém rodar SQL manual incompatível.                                                                                                                                                                        |
-| ML                    | scikit-learn carregado via `joblib.load` no boot                  | Restart necessário ao trocar o `.pkl`; sem versionamento via API.                                                                                                                                                                                       |
-| Algoritmo do modelo   | `RandomForestRegressor` (scikit-learn)                            | Treinado por `treinar_ia.py`; persistido como `MODEL_NAME="RandomForest"`/`MODEL_VERSION="v1.0.0"` em `modelos_ml`. Trocar de algoritmo exige atualizar `treinar_ia.py`, `MODEL_NAME`/`MODEL_VERSION` em `api.py` e `requirements.txt` simultaneamente. |
-| PDF                   | Gerador embutido (PDF 1.4 _single-stream_, sem reportlab/fpdf)    | Stack enxuta sem dependência adicional; limitações: somente texto, encoding WinAnsi/PDFDocEncoding (acentos sanitizados via `_pdf_sanitize`). Ver `_pdf_sanitize` em `api.py`.                                                                          |
+| Tema                  | Decisão                                                                                    | Trade-off                                                                                                                                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend               | FastAPI + Pydantic v2                                                                      | Documentação automática, validação tipada; custo de adoção mínimo.                                                                                                                                                                                      |
+| ORM                   | SQLAlchemy 1.4 com SQL textual                                                             | Controle fino sobre queries críticas; sem mapeamento ORM completo (menos abstração, mais SQL explícito).                                                                                                                                                |
+| Auth                  | JWT HS256 (access 15min) + refresh hash em DB                                              | Refresh revogável; segredo único compartilhado (não suporta rotação multi-instância sem ajuste).                                                                                                                                                        |
+| Senhas                | bcrypt via `passlib` (`bcrypt==4.0.1` pinado)                                              | `passlib 1.7.4` quebra com bcrypt ≥ 4.1; ver comentário em `requirements.txt`.                                                                                                                                                                          |
+| Verificação de e-mail | Token aleatório, **hash** persistido                                                       | Mesmo se o DB vazar, tokens não são reusáveis.                                                                                                                                                                                                          |
+| Cotas                 | Contagem em `avaliacoes` por dia                                                           | Simples e auditável; depende de DB online (sem fallback in-memory).                                                                                                                                                                                     |
+| Guest tracking        | Cookie httpOnly `prevismob_guest_id` + fallback hash IP+UA                                 | Sem PII direto; fallback é "best effort" para clientes sem cookie.                                                                                                                                                                                      |
+| Migrações             | SQL idempotente em `migrations/` + bootstrap runtime em `api.py`                           | Não exige Alembic; risco de divergência se alguém rodar SQL manual incompatível.                                                                                                                                                                        |
+| ML                    | scikit-learn carregado via `joblib.load` no boot                                           | Restart necessário ao trocar o `.pkl`; sem versionamento via API.                                                                                                                                                                                       |
+| Algoritmo do modelo   | `RandomForestRegressor` (scikit-learn)                                                     | Treinado por `treinar_ia.py`; persistido como `MODEL_NAME="RandomForest"`/`MODEL_VERSION="v1.0.0"` em `modelos_ml`. Trocar de algoritmo exige atualizar `treinar_ia.py`, `MODEL_NAME`/`MODEL_VERSION` em `api.py` e `requirements.txt` simultaneamente. |
+| PDF                   | Gerador embutido (PDF 1.4 _single-stream_, sem reportlab/fpdf)                             | Stack enxuta sem dependência adicional; limitações: somente texto, encoding WinAnsi/PDFDocEncoding (acentos sanitizados via `_pdf_sanitize`). Ver `_pdf_sanitize` em `api.py`.                                                                          |
 | Geo                   | Chamadas Google Maps por requisição + cache em `caracteristicas_localizacao` (TTL 90 dias) | Custo por chamada; cache de enriquecimento geográfico implementado via `caracteristicas_localizacao` com `expira_em` (90 dias), reduzindo chamadas repetidas ao mesmo condomínio.                                                                       |
-| Frontend              | HTML/CSS/JS puro, multi-page (4 arquivos HTML independentes)      | Zero build step; cada página é auto-contida; sem framework de roteamento.                                                                                                                                                                               |
-| Google OAuth          | Google Identity Services (ID Token server-side via `google-auth`) | Sign-in social sem armazenar senha; depende de `GOOGLE_CLIENT_ID` e conectividade com `oauth2.googleapis.com`.                                                                                                                                          |
+| Frontend              | HTML/CSS/JS puro, multi-page (4 arquivos HTML independentes)                               | Zero build step; cada página é auto-contida; sem framework de roteamento.                                                                                                                                                                               |
+| Google OAuth          | Google Identity Services (ID Token server-side via `google-auth`)                          | Sign-in social sem armazenar senha; depende de `GOOGLE_CLIENT_ID` e conectividade com `oauth2.googleapis.com`.                                                                                                                                          |
 
 ---
 
@@ -442,6 +440,7 @@ Alinhado a `docs/NEGOCIAL.md` H4:
 - [ ] CSP endurecida sem `'unsafe-inline'` (exige remover scripts/estilos inline do `index.html` ou usar nonces/hashes).
 - [ ] Auditoria de acesso a histórico/export.
 - [ ] Rotação periódica de `JWT_SECRET_KEY` (exige suporte a `kid`).
+- [ ] Endpoint `POST /v1/favoritos/{avaliacao_id}` e colunas relacionadas (`is_favorita`, índice `ix_avaliacoes_favoritas`) permanecem ativos na API/schema como legado da feature de favoritos, descontinuada na UI. Avaliar remoção completa (rota + coluna + índice) ou reintrodução da feature em iteração futura.
 
 ---
 

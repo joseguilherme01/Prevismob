@@ -11,7 +11,7 @@ Guia operacional da suite de testes. Para visão geral, ver [README.md](README.m
 - [Comandos mais usados](#comandos-mais-usados)
 - [Suite recomendada para validação diária](#suite-recomendada-para-validação-diária)
 - [Testes de auth e quota](#testes-de-auth-e-quota)
-- [Testes de histórico, favoritos, export e comparar](#testes-de-histórico-favoritos-export-e-comparar)
+- [Testes de histórico, export e comparar](#testes-de-histórico-export-e-comparar)
 - [Testes de segurança e logs](#testes-de-segurança-e-logs)
 - [Checklist manual de frontend](#checklist-manual-de-frontend)
 - [Warnings conhecidos do pytest](#warnings-conhecidos-do-pytest)
@@ -94,13 +94,12 @@ Casos cobertos hoje:
 - `/quota` para guest retorna `daily_limit=2`.
 - `/quota` para auth retorna `daily_limit=10`.
 - `/prever` retorna **429** ao 3º uso guest e ao 11º uso auth.
-- Endpoints de histórico (`/historico`, `/favoritos/{id}`, `/comparar`, `/export/*`) **exigem autenticação**.
-- Favoritar avaliação inexistente → **404**.
+- Endpoints de histórico (`/historico`, `/comparar`, `/export/*`) **exigem autenticação**.
 - `_build_quota_payload` produz estrutura correta.
 
 ---
 
-## Testes de histórico, favoritos, export e comparar
+## Testes de histórico, export e comparar
 
 Os endpoints são exercitados via `tests/test_quotas_favoritos.py` no nível de **autorização e formato**. Não há, no momento, testes que validem o **conteúdo** completo dos arquivos exportados (CSV/PDF) — verifique no código se for necessário antes de adicionar regressões.
 

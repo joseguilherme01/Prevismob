@@ -17,6 +17,7 @@ Plataforma de avaliação inteligente de imóveis em Águas Claras (DF), baseada
 
 - [Visão geral](#visão-geral)
 - [Funcionalidades principais](#funcionalidades-principais)
+- [Ajustes a partir do feedback do professor](#ajustes-a-partir-do-feedback-do-professor)
 - [Arquitetura em alto nível](#arquitetura-em-alto-nível)
 - [Pré-requisitos](#pré-requisitos)
 - [Como rodar localmente](#como-rodar-localmente)
@@ -59,6 +60,24 @@ Casos de uso típicos:
 
 ---
 
+## Ajustes a partir do feedback do professor
+
+Desde o Resumo Executivo de abril/2026, o projeto passou pelas seguintes evoluções, em resposta direta ao feedback recebido:
+
+- **Migração para API versionada (`/v1/...`)**: todos os endpoints foram movidos para o prefixo `/v1/`, com header `X-API-Version` em todas as respostas, e os testes de rotas legadas foram removidos. Detalhes em [README_ARQUITETURA.md](README_ARQUITETURA.md#versionamento-de-api).
+
+- **Login social com Google OAuth 2.0 e reestruturação do frontend**: o frontend foi reorganizado em 4 páginas independentes (landing, previsão, histórico, comparação), com login via Google Identity Services e verificação server-side do ID Token.
+
+- **Padronização visual**: cabeçalhos e cartão de usuário (nome, e-mail, logout) unificados em todas as páginas do frontend.
+
+- **Divisão formal de responsabilidades**: criado [CONTRIBUICOES.md](CONTRIBUICOES.md), documentando a contribuição individual de cada integrante do grupo.
+
+- **Suite de testes formal (IEEE 829 / ISTQB)**: planos e relatórios de execução completos para testes de caixa branca (44 casos automatizados via pytest, 100% aprovação) e caixa preta (29 casos, 24 automatizados via Selenium WebDriver). Detalhes em [README_TESTES.md](README_TESTES.md) e em `docs/`.
+
+- **Auditoria de consistência da documentação**: revisão cruzada entre arquitetura, schema do banco e documentos de teste, corrigindo contagens desatualizadas e alinhando descrições ao estado real do código — incluindo a descontinuação documentada da funcionalidade "favoritos" (mantida apenas como legado no backend, sem uso na interface).
+
+---
+
 ## Arquitetura em alto nível
 
 ```
@@ -82,7 +101,7 @@ Detalhes completos em [README_ARQUITETURA.md](README_ARQUITETURA.md).
 ## Pré-requisitos
 
 - **Python** 3.11 ou 3.12
-- **MySQL** 8.x (local ou remoto) — apenas obrigatório para fluxos de auth, histórico, favoritos, export e cotas persistentes
+- **MySQL** 8.x (local ou remoto) — apenas obrigatório para fluxos de auth, histórico, export e cotas persistentes
 - Chave válida da **Google Maps API** (Geocoding + Places habilitados)
 - Servidor SMTP **ou** modo `SMTP_DEV_MODE=1` (loga link de verificação no console)
 

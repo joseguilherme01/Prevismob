@@ -74,9 +74,6 @@ Após receber o resultado, usuários logados têm acesso a recursos adicionais:
 - Todas as avaliações realizadas ficam salvas automaticamente
 - O histórico é exibido diretamente na página do aplicativo
 
-### Favoritos
-- É possível marcar avaliações como favoritas para consultá-las rapidamente
-
 ### Comparação
 - Permite selecionar múltiplas avaliações do histórico e compará-las lado a lado
 
@@ -109,8 +106,8 @@ Acessar a plataforma
                                                         │
                                           (somente autenticados)
                                                         │
-                                          ┌─────────────┼─────────────┐
-                                          ▼             ▼             ▼
-                                      Favoritar     Comparar      Exportar
-                                                                  CSV/PDF
+                                                ┌───────┴───────┐
+                                                ▼               ▼
+                                            Comparar        Exportar
+                                                            CSV/PDF
 ```

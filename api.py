@@ -2829,7 +2829,7 @@ async def alternar_favorito(
 
 
 @app.get("/v1/comparar", tags=["Histórico"])
-async def comparar_favoritas(
+async def comparar_avaliacoes(
     ids: str | None = None,
     current_user: dict = Depends(get_current_user),
 ):

@@ -11,7 +11,7 @@ O **PrevIsmob** é uma plataforma de **avaliação inteligente de imóveis em Á
 Hoje o produto já roda em produção interna com:
 
 - Modo **guest** (uso rápido, sem cadastro, com cota limitada).
-- Modo **autenticado** (com verificação de e-mail, cota maior, histórico inline, favoritos, comparação e exportação CSV/PDF).
+- Modo **autenticado** (com verificação de e-mail, cota maior, histórico inline, comparação e exportação CSV/PDF).
 - Pipeline de coleta + ML treinado com dados reais da região.
 
 A tese: **Águas Claras é um mercado denso, padronizado e com alta liquidez**, ideal para validar um avaliador automatizado vertical antes de expandir para outras regiões do DF e, posteriormente, capitais com perfil similar (Goiânia, Curitiba, BH).
@@ -54,7 +54,7 @@ Para o comprador/vendedor isso vira **risco de pagar caro ou vender barato**. Pa
 Para cada perfil:
 
 - **Usuário final (guest):** estimativa rápida e gratuita, sem fricção. Serve como porta de entrada.
-- **Usuário autenticado:** histórico de avaliações, favoritos, comparação lado a lado e exportação (CSV/PDF) — útil para apresentar para terceiros.
+- **Usuário autenticado:** histórico de avaliações, comparação lado a lado e exportação (CSV/PDF) — útil para apresentar para terceiros.
 - **Corretor / imobiliária (futuro plano pago):** múltiplas avaliações por dia, exportação branded, e (roadmap) API/integração com CRM.
 
 Diferença prática vs. portais tradicionais: o PrevIsmob **não mostra anúncios**, mostra **estimativa de preço justo + drivers** (área, quartos, localização, proximidade de metrô etc.).
@@ -123,7 +123,7 @@ Métricas qualitativas: NPS curto após 5ª avaliação, e entrevistas com corre
 | Acurácia do modelo cai com mercado oscilando              | Alto    | Re-treino periódico + monitoramento de erro médio por bairro             |
 | Dependência de uma única região (Águas Claras)            | Médio   | Roadmap de expansão para outras regiões do DF após validação             |
 | Concorrência de portais grandes lançando “preço sugerido” | Médio   | Diferenciar por nicho, exportação profissional e atendimento ao corretor |
-| LGPD / dados pessoais em histórico/favoritos              | Médio   | Política clara, minimização de dados, exclusão self-service              |
+| LGPD / dados pessoais em histórico                        | Médio   | Política clara, minimização de dados, exclusão self-service              |
 | Abuso da cota guest (scraping da própria API)             | Médio   | Rate limit, fingerprint leve, captcha em escala                          |
 | Time pequeno / bus factor                                 | Médio   | Documentação viva (READMEs já existem), testes automatizados             |
 
