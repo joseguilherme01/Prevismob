@@ -4,12 +4,12 @@
 
 ## 1. Identificação
 
-| Campo           | Valor                                                                      |
-| --------------- | -------------------------------------------------------------------------- |
-| **Nome**        | Relatório de Implementação e Execução de Testes de Caixa Preta — PrevIsmob |
-| **Versão**      | 1.0                                                                        |
-| **Data**        | 27/05/2026                                                                 |
-| **Projeto**     | PrevIsmob — Plataforma de Avaliação de Imóveis                             |
+| Campo                     | Valor                                                                       |
+| ------------------------- | --------------------------------------------------------------------------- |
+| **Nome**                  | Relatório de Implementação e Execução de Testes de Caixa Preta — PrevIsmob  |
+| **Versão**                | 1.0                                                                         |
+| **Data**                  | 27/05/2026                                                                  |
+| **Projeto**               | PrevIsmob — Plataforma de Avaliação de Imóveis                              |
 | **Responsável**           | Eduardo Borges de Carvalho (Qualidade e Testes)                             |
 | **Execução automatizada** | Selenium WebDriver + pytest (`test_selenium_prevismob.py`) — 24 de 29 casos |
 
@@ -17,7 +17,7 @@
 
 ## 2. Objetivo
 
-Registrar a execução manual dos testes de caixa preta realizados no sistema PrevIsmob, documentando os cenários testados, os resultados observados e as conclusões da campanha de testes. Os testes foram conduzidos diretamente na interface web, simulando o comportamento de um usuário real, sem acesso ao código-fonte do sistema.
+Registrar a execução dos testes de caixa preta realizados no sistema PrevIsmob — tanto manualmente quanto via automação com Selenium WebDriver — documentando os cenários testados, os resultados observados e as conclusões da campanha de testes. Os testes foram conduzidos diretamente na interface web, simulando o comportamento de um usuário real, sem acesso ao código-fonte do sistema.
 
 ---
 
@@ -38,6 +38,7 @@ Registrar a execução manual dos testes de caixa preta realizados no sistema Pr
 - Verificação da conexão com o banco de dados MySQL antes do início dos testes
 - Criação de uma conta de teste com e-mail e senha válidos para os cenários autenticados
 - Execução manual dos casos de teste no navegador Google Chrome, seguindo a ordem dos grupos definidos no plano
+- Execução automatizada via Selenium WebDriver + pytest (`test_selenium_prevismob.py`), cobrindo 24 dos 29 casos
 - Registro dos resultados observados em cada caso de teste
 
 ---
@@ -58,8 +59,8 @@ Registrar a execução manual dos testes de caixa preta realizados no sistema Pr
 
 ### Grupo 2 — Cadastro (CT-008 a CT-012)
 
-| ID     | Condição Relacionada                               | Status Implementação | Observações                                                                                          |
-| ------ | -------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| ID     | Condição Relacionada                               | Status Implementação | Observações                                                                                                                                                                    |
+| ------ | -------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | CT-008 | Tentar cadastrar com campos em branco              | Automatizado         | O sistema exibe mensagens de erro nos campos obrigatórios e não conclui o cadastro.                                                                                            |
 | CT-009 | Tentar cadastrar com e-mail em formato inválido    | Automatizado         | O campo de e-mail exibe erro indicando formato incorreto antes de enviar.                                                                                                      |
 | CT-010 | Digitar senha fraca e verificar o indicador visual | Automatizado         | O indicador de força da senha muda conforme o usuário digita, mostrando "Fraca", "Média" ou "Forte".                                                                           |
@@ -68,26 +69,26 @@ Registrar a execução manual dos testes de caixa preta realizados no sistema Pr
 
 ### Grupo 3 — Login e acesso autenticado (CT-013 a CT-018)
 
-| ID     | Condição Relacionada                       | Status Implementação | Observações                                                                                         |
-| ------ | ------------------------------------------ | -------------------- | --------------------------------------------------------------------------------------------------- |
-| CT-013 | Tentar fazer login com senha incorreta     | Automatizado                          | O sistema exibe mensagem de erro e não concede acesso.                                                                                                                                                                    |
-| CT-014 | Fazer login com e-mail e senha corretos    | Automatizado                          | O login é bem-sucedido, a barra de navegação muda para o estado autenticado e a cota exibe 0 de 10.                                                                                                                       |
-| CT-015 | Fazer login com conta Google               | Não automatizado (decisão de projeto) | O botão "Entrar com Google" abre o fluxo de autenticação e o login é concluído com sucesso. Não automatizado: Google OAuth requer credenciais especiais não automatizáveis sem interação manual.                           |
-| CT-016 | Fazer até 10 previsões estando logado      | Automatizado                          | Cada previsão é aceita normalmente; o contador de cotas vai de 0 até 10. Na execução automatizada, executa apenas 3 previsões para confirmar o mecanismo de contagem, sem precisar chegar a 10.                           |
+| ID     | Condição Relacionada                       | Status Implementação                  | Observações                                                                                                                                                                                                                    |
+| ------ | ------------------------------------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CT-013 | Tentar fazer login com senha incorreta     | Automatizado                          | O sistema exibe mensagem de erro e não concede acesso.                                                                                                                                                                         |
+| CT-014 | Fazer login com e-mail e senha corretos    | Automatizado                          | O login é bem-sucedido, a barra de navegação muda para o estado autenticado e a cota exibe 0 de 10.                                                                                                                            |
+| CT-015 | Fazer login com conta Google               | Não automatizado (decisão de projeto) | O botão "Entrar com Google" abre o fluxo de autenticação e o login é concluído com sucesso. Não automatizado: Google OAuth requer credenciais especiais não automatizáveis sem interação manual.                               |
+| CT-016 | Fazer até 10 previsões estando logado      | Automatizado                          | Cada previsão é aceita normalmente; o contador de cotas vai de 0 até 10. Na execução automatizada, executa apenas 3 previsões para confirmar o mecanismo de contagem, sem precisar chegar a 10.                                |
 | CT-017 | Tentar fazer a 11ª previsão estando logado | Não automatizado (decisão de projeto) | O sistema bloqueia a tentativa com uma mensagem informando que o limite diário foi atingido. Não automatizado: comportamento já coberto pelos testes de caixa branca (TC-024); evita executar 10 previsões reais por execução. |
-| CT-018 | Verificar o indicador de cota na tela      | Automatizado                          | O indicador ("badge") na página de previsão exibe o número de previsões usadas e o limite total.                                                                                                                          |
+| CT-018 | Verificar o indicador de cota na tela      | Automatizado                          | O indicador ("badge") na página de previsão exibe o número de previsões usadas e o limite total.                                                                                                                               |
 
 ### Grupo 4 — Histórico e comparação (CT-019 a CT-025)
 
-| ID     | Condição Relacionada                            | Status Implementação | Observações                                                                            |
-| ------ | ----------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------- |
-| CT-019 | Acessar o histórico estando logado              | Automatizado                          | A página de histórico exibe os cards das avaliações realizadas pelo usuário.                                                                                                                           |
-| CT-020 | Selecionar 1 avaliação no histórico             | Não automatizado (decisão de projeto) | Um card é selecionado e o botão flutuante "Comparar 1 selecionado" aparece na tela. Não automatizado: a automação seleciona diretamente 2 avaliações; selecionar apenas 1 não representa cenário de comparação válido.  |
-| CT-021 | Selecionar 2 avaliações no histórico            | Automatizado                          | Dois cards são selecionados e o botão flutuante exibe "Comparar 2 selecionados".                                                                                                                       |
-| CT-022 | Tentar selecionar uma 3ª avaliação no histórico | Automatizado                          | O sistema impede a seleção de mais de 2 avaliações simultaneamente.                                                                                                                                    |
-| CT-023 | Clicar em "Comparar" e verificar a página       | Automatizado                          | A página de comparação abre exibindo as duas avaliações lado a lado com gráfico radar.                                                                                                                 |
-| CT-024 | Exportar a comparação em CSV                    | Não automatizado (decisão de projeto) | O arquivo CSV é gerado e o download é iniciado automaticamente pelo navegador. Não automatizado: intercepção de download via Selenium requer configuração adicional de perfil do browser.               |
-| CT-025 | Exportar a comparação em PDF                    | Não automatizado (decisão de projeto) | O arquivo PDF é gerado e o download é iniciado automaticamente pelo navegador. Não automatizado: intercepção de download via Selenium requer configuração adicional de perfil do browser.               |
+| ID     | Condição Relacionada                            | Status Implementação                  | Observações                                                                                                                                                                                                            |
+| ------ | ----------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CT-019 | Acessar o histórico estando logado              | Automatizado                          | A página de histórico exibe os cards das avaliações realizadas pelo usuário.                                                                                                                                           |
+| CT-020 | Selecionar 1 avaliação no histórico             | Não automatizado (decisão de projeto) | Um card é selecionado e o botão flutuante "Comparar 1 selecionado" aparece na tela. Não automatizado: a automação seleciona diretamente 2 avaliações; selecionar apenas 1 não representa cenário de comparação válido. |
+| CT-021 | Selecionar 2 avaliações no histórico            | Automatizado                          | Dois cards são selecionados e o botão flutuante exibe "Comparar 2 selecionados".                                                                                                                                       |
+| CT-022 | Tentar selecionar uma 3ª avaliação no histórico | Automatizado                          | O sistema impede a seleção de mais de 2 avaliações simultaneamente.                                                                                                                                                    |
+| CT-023 | Clicar em "Comparar" e verificar a página       | Automatizado                          | A página de comparação abre exibindo as duas avaliações lado a lado com gráfico radar.                                                                                                                                 |
+| CT-024 | Exportar a comparação em CSV                    | Não automatizado (decisão de projeto) | O arquivo CSV é gerado e o download é iniciado automaticamente pelo navegador. Não automatizado: intercepção de download via Selenium requer configuração adicional de perfil do browser.                              |
+| CT-025 | Exportar a comparação em PDF                    | Não automatizado (decisão de projeto) | O arquivo PDF é gerado e o download é iniciado automaticamente pelo navegador. Não automatizado: intercepção de download via Selenium requer configuração adicional de perfil do browser.                              |
 
 ### Grupo 5 — Navegação (CT-026 a CT-029)
 
@@ -102,14 +103,14 @@ Registrar a execução manual dos testes de caixa preta realizados no sistema Pr
 
 ## 6. Execução dos Testes
 
-| Campo                    | Valor                                                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| **Período de execução**  | 27/05/2026                                                                                                    |
-| **Responsável**          | Eduardo Borges de Carvalho                                                                                    |
-| **Ferramenta**            | Google Chrome (execução manual) + Selenium WebDriver + pytest (execução automatizada)                        |
-| **Ambiente**              | `http://127.0.0.1:8000`                                                                                       |
-| **Execução automatizada** | `pytest test_selenium_prevismob.py -v`                                                                        |
-| **Critério de execução**  | Execução manual original + 24 casos automatizados via Selenium WebDriver + pytest                             |
+| Campo                     | Valor                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------- |
+| **Período de execução**   | 27/05/2026                                                                            |
+| **Responsável**           | Eduardo Borges de Carvalho                                                            |
+| **Ferramenta**            | Google Chrome (execução manual) + Selenium WebDriver + pytest (execução automatizada) |
+| **Ambiente**              | `http://127.0.0.1:8000`                                                               |
+| **Execução automatizada** | `pytest test_selenium_prevismob.py -v`                                                |
+| **Critério de execução**  | Execução manual original + 24 casos automatizados via Selenium WebDriver + pytest     |
 
 ---
 
@@ -175,8 +176,8 @@ Registrar a execução manual dos testes de caixa preta realizados no sistema Pr
 
 ### Resumo de Execução
 
-| Métrica                 | Valor |
-| ----------------------- | ----- |
+| Métrica                                | Valor |
+| -------------------------------------- | ----- |
 | Total de casos de teste                | 29    |
 | Aprovados                              | 29    |
 | Reprovados                             | 0     |

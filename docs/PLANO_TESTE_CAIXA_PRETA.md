@@ -54,6 +54,8 @@ Este plano descreve a estratégia de testes de caixa preta do PrevIsmob, realiza
 
 **Tipo de Teste:** Caixa Preta — funcional e exploratório. Os testes são realizados pela interface web, sem conhecimento ou acesso ao código interno.
 
+**Estratégia de execução:** híbrida. A maioria dos casos é automatizada via Selenium WebDriver + pytest; a execução manual é reservada para cenários onde a automação não é viável ou não agrega valor (ver "Critérios de automação" abaixo).
+
 **Técnicas utilizadas:**
 
 | Técnica                         | Como foi aplicada                                                                                                                                                         |
@@ -62,7 +64,14 @@ Este plano descreve a estratégia de testes de caixa preta do PrevIsmob, realiza
 | Análise de Valores Limite       | Testamos exatamente no limite da cota: a 2ª previsão como visitante deve ser aceita, a 3ª deve ser bloqueada; a 10ª como usuário logado deve ser aceita, a 11ª bloqueada. |
 | Testes Exploratórios            | Navegação livre pelo sistema para identificar comportamentos inesperados não cobertos pelos casos planejados.                                                             |
 
-**Ferramenta:** Navegador Google Chrome (versão mais recente)
+**Ferramenta:** Navegador Google Chrome (versão mais recente) para execução manual; Selenium WebDriver + pytest (`test_selenium_prevismob.py`) para execução automatizada.
+
+**Critérios de automação:** um caso de teste é automatizado por padrão, exceto quando:
+
+- Depende de serviço externo de terceiros não controlável em ambiente de teste (ex.: login via Google OAuth)
+- Envolve interceptação de download de arquivo, não coberta pela suite atual (ex.: exportação CSV/PDF)
+- Já é coberto por teste de caixa branca equivalente, e repetir manualmente evita custo de execução redundante (ex.: bloqueio da 11ª previsão)
+- Representa cenário inválido pelo próprio design do sistema (ex.: seleção de apenas 1 item para comparação, quando o mínimo é 2)
 
 **Ambiente:** `http://127.0.0.1:8000`
 
@@ -113,13 +122,14 @@ Este plano descreve a estratégia de testes de caixa preta do PrevIsmob, realiza
 
 **Ambiente de teste:**
 
-| Recurso                 | Descrição                                         |
-| ----------------------- | ------------------------------------------------- |
-| Navegador               | Google Chrome (versão mais recente)               |
-| Sistema em execução     | PrevIsmob rodando em `http://127.0.0.1:8000`      |
-| Banco de dados          | MySQL 8.x conectado localmente                    |
-| Conta de teste          | E-mail e senha válidos para cenários autenticados |
-| Conta Google (opcional) | Para testar o fluxo de login com Google           |
+| Recurso                 | Descrição                                                   |
+| ----------------------- | ----------------------------------------------------------- |
+| Navegador               | Google Chrome (versão mais recente)                         |
+| Sistema em execução     | PrevIsmob rodando em `http://127.0.0.1:8000`                |
+| Banco de dados          | MySQL 8.x conectado localmente                              |
+| Conta de teste          | E-mail e senha válidos para cenários autenticados           |
+| Conta Google (opcional) | Para testar o fluxo de login com Google                     |
+| Ferramenta de automação | Selenium WebDriver + pytest (`pip install selenium pytest`) |
 
 ---
 
@@ -131,6 +141,7 @@ Este plano descreve a estratégia de testes de caixa preta do PrevIsmob, realiza
 | Definição dos casos de teste de caixa preta | Março – Abril 2026 | Eduardo                  |
 | Elaboração do plano de teste                | Maio 2026          | Eduardo                  |
 | Execução manual dos casos de teste          | Maio – Junho 2026  | Eduardo                  |
+| Execução automatizada (Selenium + pytest)   | Junho 2026         | José Guilherme / Eduardo |
 | Registro dos resultados e conclusão         | Junho 2026         | Eduardo                  |
 | Entrega final e demonstração ao vivo        | Junho 2026         | Todos os integrantes     |
 
@@ -138,13 +149,14 @@ Este plano descreve a estratégia de testes de caixa preta do PrevIsmob, realiza
 
 ## 11. Riscos
 
-| Risco                                         | Impacto | Plano de mitigação                                                                     |
-| --------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
-| Sistema fora do ar durante a execução         | Alto    | Reiniciar o servidor local com `uvicorn api:app --reload`.                             |
-| Google OAuth indisponível no momento do teste | Médio   | Testar o login por e-mail como alternativa e registrar a ocorrência.                   |
-| Cota diária já consumida antes do teste       | Médio   | Criar uma nova conta de teste ou aguardar a virada do dia.                             |
-| Banco de dados MySQL desconectado             | Alto    | Verificar a conexão e reiniciar o banco antes de executar.                             |
-| E-mail de verificação não chegando            | Baixo   | Usar o modo de desenvolvimento (`SMTP_DEV_MODE=1`) e verificar o terminal do servidor. |
+| Risco                                                                             | Impacto | Plano de mitigação                                                                                                                   |
+| --------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Sistema fora do ar durante a execução                                             | Alto    | Reiniciar o servidor local com `uvicorn api:app --reload`.                                                                           |
+| Google OAuth indisponível no momento do teste                                     | Médio   | Testar o login por e-mail como alternativa e registrar a ocorrência.                                                                 |
+| Cota diária já consumida antes do teste                                           | Médio   | Criar uma nova conta de teste ou aguardar a virada do dia.                                                                           |
+| Banco de dados MySQL desconectado                                                 | Alto    | Verificar a conexão e reiniciar o banco antes de executar.                                                                           |
+| E-mail de verificação não chegando                                                | Baixo   | Usar o modo de desenvolvimento (`SMTP_DEV_MODE=1`) e verificar o terminal do servidor.                                               |
+| Instabilidade de testes automatizados entre máquinas (viewport/resolução de tela) | Médio   | Fixar o tamanho da janela do navegador via `--window-size` no Selenium, em vez de depender da resolução local (`--start-maximized`). |
 
 ---
 
