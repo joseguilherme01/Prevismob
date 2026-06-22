@@ -8,12 +8,12 @@ Este documento registra a divisão formal de responsabilidades entre os quatro i
 
 ## Tabela Resumo
 
-| Integrante | Matrícula | Domínio |
-|---|---|---|
-| José Guilherme Ferreira dos Santos | 22408953 | Arquitetura, Backend, Machine Learning e Segurança |
-| Kaua Alves Guerreiro | 22407488 | Produto, Negócio e Comunicação Executiva |
-| Gabriel de Abreu da Silva | 22401025 | Documentação Técnica e Arquitetura de Sistema |
-| Eduardo Borges de Carvalho | 22403669 | Qualidade, Testes, Segurança e Demo |
+| Integrante                         | Matrícula | Domínio                                            |
+| ---------------------------------- | --------- | -------------------------------------------------- |
+| José Guilherme Ferreira dos Santos | 22408953  | Arquitetura, Backend, Machine Learning e Segurança |
+| Kaua Alves Guerreiro               | 22407488  | Produto, Negócio e Comunicação Executiva           |
+| Gabriel de Abreu da Silva          | 22401025  | Documentação Técnica e Arquitetura de Sistema      |
+| Eduardo Borges de Carvalho         | 22403669  | Qualidade, Testes, Segurança e Demo                |
 
 ---
 
@@ -89,6 +89,7 @@ Problema de negócio que o PrevIsmob resolve, proposta de valor para o usuário 
 - Documentação do sistema de cotas (usuário anônimo versus autenticado)
 - Descrição do mecanismo de autenticação e do modo de acesso anônimo
 - Elaboração do `README_ARQUITETURA.md` como referência técnica do projeto
+- Desenvolvimento de dashboard analítico com visualizações dos dados do PrevIsmob (gráficos e métricas sobre avaliações realizadas na plataforma) — desenvolvido como entrega complementar
 
 **Módulos e arquivos relacionados:**
 
@@ -111,12 +112,18 @@ Arquitetura do sistema (componentes, camadas e integrações), endpoints da API 
 - Elaboração de checklist de qualidade para o frontend
 - Documentação das práticas de segurança adotadas e conformidade com a LGPD
 - Redação do `README_TESTES.md` com visão geral da suite de testes
+- Elaboração dos documentos formais de teste seguindo o padrão IEEE 829/ISTQB: planos e relatórios de execução de testes de caixa branca (45 casos automatizados via pytest) e caixa preta (29 casos, 25 automatizados via Selenium WebDriver)
 - Condução da demonstração ao vivo na apresentação final
 
 **Módulos e arquivos relacionados:**
 
 - `README_TESTES.md` — documentação da estratégia de testes
 - `tests/` — suite de testes automatizados
+- `docs/PLANO_TESTE_CAIXA_BRANCA.md` — plano formal de testes de caixa branca (IEEE 829/ISTQB)
+- `docs/EXECUCAO_TESTES_CAIXA_BRANCA.md` — relatório de execução dos 45 casos de teste de caixa branca
+- `docs/PLANO_TESTE_CAIXA_PRETA.md` — plano formal de testes de caixa preta (IEEE 829/ISTQB)
+- `docs/EXECUCAO_TESTES_CAIXA_PRETA.md` — relatório de execução dos 29 casos de teste de caixa preta
+- `test_selenium_prevismob.py` — suite de testes automatizados Selenium WebDriver (25 casos)
 
 **Defende na apresentação:**
 
