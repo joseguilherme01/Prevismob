@@ -127,12 +127,6 @@ Arquitetura do sistema (componentes, camadas e integrações), endpoints da API 
 
 **Defende na apresentação:**
 
-Estratégia de testes adotada e como o sistema foi validado, mecanismos de segurança implementados (bcrypt, JWT, LGPD, headers HTTP de segurança), e demonstração ao vivo do fluxo completo do produto (cadastro, login, previsão, histórico).
+Estratégia de testes adotada e como o sistema foi validado, mecanismos de segurança implementados (bcrypt, JWT, LGPD, headers HTTP de segurança), e demonstração ao vivo do fluxo completo do produto (cadastro, login, previsão, histórico e comparação).
 
 ---
-
-## Nota sobre desenvolvimento
-
-Em projetos de engenharia de software aplicada, é comum que a implementação técnica seja concentrada nos integrantes com maior experiência prática nas tecnologias envolvidas. Isso não diminui a participação dos demais: cada integrante estudou, compreendeu e documentou o seu domínio com profundidade suficiente para defendê-lo perante uma banca avaliadora.
-
-A divisão adotada neste projeto reflete uma estrutura realista de equipes de produto, onde diferentes perfis — técnico, de negócio, de documentação e de qualidade — contribuem de formas distintas para um resultado coeso. Todos os integrantes conhecem o produto que construíram e são capazes de responder perguntas sobre suas respectivas áreas.
