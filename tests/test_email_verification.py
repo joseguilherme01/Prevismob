@@ -125,3 +125,21 @@ def test_login_apos_verificar_retorna_200_com_token(client, fake_db):
     assert body["refresh_token"]
     assert body["token_type"] == "Bearer"
     assert body["usuario"]["email"] == "maria.silva@email.com"
+
+
+def test_cadastro_email_duplicado_retorna_409(client, fake_db):
+    """Regressão: cadastrar e-mail já existente deve retornar 409, não 500.
+    Garante que a função async def obter_status_sistema() não sobrescreve
+    o módulo status do FastAPI no namespace global de api.py."""
+    payload = {
+        "nome": "Teste Duplicado",
+        "email": "duplicado@example.com",
+        "senha": "SenhaForte!2026",
+        "confirmar_senha": "SenhaForte!2026",
+    }
+    r1 = client.post("/v1/auth/register", json=payload)
+    assert r1.status_code == 201, f"Primeiro cadastro deveria ser 201, foi {r1.status_code}"
+
+    r2 = client.post("/v1/auth/register", json=payload)
+    assert r2.status_code == 409, f"E-mail duplicado deveria retornar 409, retornou {r2.status_code}"
+    assert "cadastrado" in r2.json().get("detail", "").lower()

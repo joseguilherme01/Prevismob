@@ -3142,7 +3142,7 @@ async def exportar_pdf(
 
 
 @app.get("/v1/status", tags=["Info"])
-async def status():
+async def obter_status_sistema():
     """Verifica status da API, dataset e modelo"""
     db_ok = False
     if engine is not None:
