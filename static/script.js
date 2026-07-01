@@ -894,6 +894,12 @@ document.addEventListener("DOMContentLoaded", async function () {
     });
   }
 
+  // Abre painel de login automaticamente se URL contém ?aba=login
+  // (usado pelo link "Voltar ao login" das páginas de recuperação de senha)
+  if (new URLSearchParams(window.location.search).get("aba") === "login") {
+    mostrarAuthSection("", "login", { next: "landing" });
+  }
+
   // ========== NAV LANDING (login/registro/logout/histórico) ==========
   const navBtnLogin = document.getElementById("nav-btn-login");
   if (navBtnLogin) {

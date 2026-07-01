@@ -309,3 +309,126 @@ def send_verification_email(to_email: str, token: str) -> bool:
                 exc_info=True,
             )
         return False
+
+
+def send_reset_senha_email(to_email: str, reset_link: str) -> bool:
+    """
+    Envia e-mail de recuperação de senha. Retorna True em sucesso (ou em modo dev).
+
+    Modos (``EMAIL_MODE``):
+    - ``dev``: apenas loga o link no terminal.
+    - ``prod``: envia via SMTP real.
+    """
+    mode = _resolve_email_mode()
+
+    if mode == "dev":
+        if _is_dev_env():
+            logger.info(
+                "[DEV] reset_senha email sent to=%s link=%s entrega=simulada",
+                to_email, reset_link,
+            )
+        else:
+            try:
+                from urllib.parse import urlparse
+                host_only = urlparse(reset_link).hostname or "unknown"
+            except Exception:  # noqa: BLE001
+                host_only = "unknown"
+            logger.info(
+                "reset_senha email sent to=%s host=%s status=ok entrega=simulada",
+                _mask_email(to_email), host_only,
+            )
+        return True
+
+    # -------- PROD --------
+    host = _env("SMTP_HOST")
+    port = int(_env("SMTP_PORT", "587") or "587")
+    user = _env("SMTP_USER")
+    password = os.getenv("SMTP_PASS") or ""
+    use_ssl = _env("SMTP_USE_SSL", "0") == "1" or port == 465
+    use_tls = _env("SMTP_USE_TLS", "1") == "1"
+    timeout = int(_env("SMTP_TIMEOUT", "15") or "15")
+
+    if not host:
+        logger.error(
+            "[EMAIL_MODE=prod] SMTP_HOST ausente — impossível enviar e-mail de reset para %s",
+            _mask_email(to_email),
+        )
+        return False
+
+    msg = EmailMessage()
+    msg["Subject"] = "Recuperação de senha - PrevIsmob"
+    msg["From"] = _resolve_from_address()
+    msg["To"] = to_email
+    msg.set_content(
+        "Olá!\n\n"
+        "Recebemos uma solicitação para redefinir a senha da sua conta no PrevIsmob.\n\n"
+        "Clique no link abaixo para criar uma nova senha (válido por 15 minutos):\n\n"
+        f"{reset_link}\n\n"
+        "Se você não solicitou a recuperação de senha, ignore esta mensagem.\n"
+    )
+    msg.add_alternative(
+        f"""<!doctype html>
+<html><body style="font-family:Arial,sans-serif;background:#f6f8fa;padding:24px;">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:8px;
+              padding:28px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+    <h2 style="margin:0 0 12px;color:#1f2328;">Recuperação de senha</h2>
+    <p style="color:#1f2328;">Recebemos uma solicitação para redefinir a senha da sua conta no
+      <strong>PrevIsmob</strong>. Clique no botão abaixo (válido por 15 minutos):</p>
+    <p style="text-align:center;margin:24px 0;">
+      <a href="{reset_link}"
+         style="display:inline-block;padding:12px 22px;background:#1f6feb;color:#fff;
+                text-decoration:none;border-radius:6px;font-weight:600;">
+        Redefinir senha
+      </a>
+    </p>
+    <p style="color:#57606a;font-size:13px;">Se o botão não funcionar, copie e cole o link abaixo no navegador:</p>
+    <p style="word-break:break-all;font-size:12px;"><code>{reset_link}</code></p>
+    <hr style="border:none;border-top:1px solid #eaeef2;margin:20px 0;">
+    <p style="color:#8b949e;font-size:12px;">Se você não solicitou a recuperação de senha, ignore esta mensagem.</p>
+  </div>
+</body></html>""",
+        subtype="html",
+    )
+
+    try:
+        if use_ssl:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, port, context=context, timeout=timeout) as server:
+                if user:
+                    server.login(user, password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port, timeout=timeout) as server:
+                server.ehlo()
+                if use_tls:
+                    server.starttls(context=ssl.create_default_context())
+                    server.ehlo()
+                if user:
+                    server.login(user, password)
+                server.send_message(msg)
+        logger.info(
+            "reset_senha email sent to=%s host=%s port=%s status=ok entrega=real",
+            _mask_email(to_email), host, port,
+        )
+        return True
+    except smtplib.SMTPAuthenticationError as exc:
+        logger.error(
+            "[EMAIL_MODE=prod] falha de autenticação SMTP reset to=%s host=%s err=%s",
+            _mask_email(to_email), host,
+            exc.smtp_code if hasattr(exc, "smtp_code") else "?",
+            exc_info=True,
+        )
+        return False
+    except (smtplib.SMTPException, OSError) as exc:
+        if _is_dev_env():
+            logger.error(
+                "[EMAIL_MODE=prod] falha SMTP reset to=%s host=%s err=%s",
+                to_email, host, exc, exc_info=True,
+            )
+        else:
+            logger.error(
+                "[EMAIL_MODE=prod] falha SMTP reset to=%s host=%s err_type=%s",
+                _mask_email(to_email), host, type(exc).__name__,
+                exc_info=True,
+            )
+        return False

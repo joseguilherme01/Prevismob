@@ -564,6 +564,10 @@
                 </div>
               </div>
 
+              <div style="text-align:right;margin-top:-8px;margin-bottom:12px;">
+                <a href="/recuperar-senha" style="font-size:.85rem;color:#0969da;text-decoration:none;">Esqueci minha senha</a>
+              </div>
+
               <!-- CTA de reenvio (aparece após 403 e-mail não verificado) -->
               <div
                 class="auth-resend"
@@ -899,6 +903,17 @@
     <script src="script.js"></script>
     <!-- Campo de condomínio: texto livre — geocoding feito pelo backend (Google Maps Python client) -->
     <script>
+      /* ============================================================
+       DEEP LINK: ?aba=login — abre painel de login automaticamente
+       ============================================================ */
+      (function () {
+        var aba = new URLSearchParams(window.location.search).get("aba");
+        if (aba === "login" && typeof mostrarAuthSection === "function") {
+          mostrarAuthSection("", "login", { next: "landing" });
+          history.replaceState(null, "", window.location.pathname);
+        }
+      })();
+
       /* ============================================================
        HAMBURGUER MENU (mobile)
        ============================================================ */

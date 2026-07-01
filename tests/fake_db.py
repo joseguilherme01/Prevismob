@@ -23,6 +23,8 @@ class FakeUser:
     email_verificacao_expira_em: Optional[datetime] = None
     email_verificacao_enviado_em: Optional[datetime] = None
     ultimo_login_em: Optional[datetime] = None
+    reset_senha_token_hash: Optional[str] = None
+    reset_senha_expira_em: Optional[datetime] = None
 
 
 @dataclass
@@ -31,6 +33,7 @@ class FakeDB:
     sessions: List[dict] = field(default_factory=list)
     next_user_id: int = 1
     emails_sent: List[dict] = field(default_factory=list)
+    reset_emails_sent: List[dict] = field(default_factory=list)
 
     # ---------- usuários ----------
     def get_by_email(self, email: str) -> Optional[FakeUser]:
@@ -56,6 +59,12 @@ class FakeDB:
         self.next_user_id += 1
         self.users[uid] = FakeUser(id_usuario=uid, **kw)
         return uid
+
+    def get_by_reset_token_hash(self, h: str) -> Optional[FakeUser]:
+        for u in self.users.values():
+            if u.reset_senha_token_hash == h:
+                return u
+        return None
 
     def email_exists(self, email: str) -> bool:
         return self.get_by_email(email) is not None

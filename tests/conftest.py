@@ -45,6 +45,8 @@ def fake_db(monkeypatch) -> FakeDB:
     monkeypatch.setattr(api_module, "_ensure_email_verification_columns", lambda: None)
     if hasattr(api_module, "_ensure_quota_favoritos_columns"):
         monkeypatch.setattr(api_module, "_ensure_quota_favoritos_columns", lambda: None)
+    if hasattr(api_module, "_ensure_reset_senha_columns"):
+        monkeypatch.setattr(api_module, "_ensure_reset_senha_columns", lambda: None)
 
     # ---- usuários ----
     def _email_already_registered(email: str) -> bool:
@@ -137,14 +139,51 @@ def fake_db(monkeypatch) -> FakeDB:
     if hasattr(api_module, "_delete_user_account"):
         monkeypatch.setattr(api_module, "_delete_user_account", _delete_user_account)
 
+    # ---- helpers de reset de senha ----
+    def _get_user_by_reset_token_hash(token_hash: str):
+        u = db.get_by_reset_token_hash(token_hash)
+        return u.__dict__.copy() if u else None
+
+    def _set_reset_senha_token(user_id: int, token_hash: str, expira_em):
+        u = db.get_by_id(user_id)
+        if u:
+            u.reset_senha_token_hash = token_hash
+            u.reset_senha_expira_em = expira_em
+
+    def _clear_reset_senha_token(user_id: int):
+        u = db.get_by_id(user_id)
+        if u:
+            u.reset_senha_token_hash = None
+            u.reset_senha_expira_em = None
+
+    def _update_senha_hash(user_id: int, nova_senha_hash: str):
+        u = db.get_by_id(user_id)
+        if u:
+            u.senha_hash = nova_senha_hash
+
+    def _revoke_user_sessions(user_id: int):
+        db.sessions = [s for s in db.sessions if int(s.get("user_id", 0)) != int(user_id)]
+
+    monkeypatch.setattr(api_module, "_get_user_by_reset_token_hash", _get_user_by_reset_token_hash)
+    monkeypatch.setattr(api_module, "_set_reset_senha_token", _set_reset_senha_token)
+    monkeypatch.setattr(api_module, "_clear_reset_senha_token", _clear_reset_senha_token)
+    monkeypatch.setattr(api_module, "_update_senha_hash", _update_senha_hash)
+    monkeypatch.setattr(api_module, "_revoke_user_sessions", _revoke_user_sessions)
+
     # ---- spy de envio de e-mail: captura token puro para testes ----
     def _spy_send(to_email: str, token: str) -> bool:
         db.emails_sent.append({"to": to_email, "token": token})
         return True
 
+    def _spy_send_reset(to_email: str, reset_link: str) -> bool:
+        db.reset_emails_sent.append({"to": to_email, "link": reset_link})
+        return True
+
     # Substituir em AMBOS os módulos: email_service (canônico) e api (import local)
     monkeypatch.setattr(email_service, "send_verification_email", _spy_send)
     monkeypatch.setattr(api_module, "send_verification_email", _spy_send)
+    monkeypatch.setattr(email_service, "send_reset_senha_email", _spy_send_reset)
+    monkeypatch.setattr(api_module, "send_reset_senha_email", _spy_send_reset)
 
     return db
 

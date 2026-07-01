@@ -348,6 +348,40 @@ class ReenvioVerificacaoRequest(BaseModel):
         return v
 
 
+class RecuperarSenhaRequest(BaseModel):
+    email: EmailStr = Field(..., description="E-mail da conta para recuperação de senha.")
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _normalize_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+
+class ResetSenhaRequest(BaseModel):
+    token: str = Field(..., min_length=1, description="Token de reset recebido por e-mail.")
+    nova_senha: str = Field(..., min_length=8, max_length=128)
+    confirmar_senha: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("nova_senha")
+    @classmethod
+    def _validate_nova_senha_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Senha deve ter no mínimo 8 caracteres.")
+        if not _PASSWORD_LETTER_REGEX.search(v):
+            raise ValueError("Senha deve conter pelo menos 1 letra.")
+        if not _PASSWORD_DIGIT_REGEX.search(v):
+            raise ValueError("Senha deve conter pelo menos 1 número.")
+        return v
+
+    @model_validator(mode="after")
+    def _check_senhas_iguais(self) -> "ResetSenhaRequest":
+        if self.nova_senha != self.confirmar_senha:
+            raise ValueError("Senha e confirmação não conferem.")
+        return self
+
+
 class RegisterResponse(BaseModel):
     """Resposta do cadastro: usuário criado + instrução de verificação."""
 
@@ -522,11 +556,13 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 EMAIL_VERIFY_TTL_HOURS = int(os.getenv("EMAIL_VERIFY_TTL_HOURS", "24"))
 EMAIL_VERIFY_RESEND_COOLDOWN_MIN = int(os.getenv("EMAIL_VERIFY_RESEND_COOLDOWN_MIN", "2"))
+APP_BASE_URL: str = (os.getenv("APP_BASE_URL") or "http://127.0.0.1:8000").strip()
 
 from email_service import (  # noqa: E402  (import tardio proposital)
     build_verification_link,
     generate_verification_token,
     hash_token,
+    send_reset_senha_email,
     send_verification_email,
     tokens_match,
 )
@@ -831,6 +867,64 @@ def _ensure_google_oauth_columns() -> None:
 
 
 _ensure_google_oauth_columns()
+
+
+def _ensure_reset_senha_columns() -> None:
+    """Migração runtime idempotente: adiciona colunas de reset de senha se ausentes."""
+    if engine is None:
+        return
+    required = {
+        "reset_senha_token_hash": "VARCHAR(128) NULL DEFAULT NULL",
+        "reset_senha_expira_em": "DATETIME NULL DEFAULT NULL",
+    }
+    try:
+        with engine.begin() as conn:
+            existing = {
+                row[0]
+                for row in conn.execute(
+                    text(
+                        """
+                        SELECT COLUMN_NAME
+                        FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = 'usuarios'
+                        """
+                    )
+                ).all()
+            }
+            for col, ddl in required.items():
+                if col not in existing:
+                    conn.execute(text(f"ALTER TABLE usuarios ADD COLUMN {col} {ddl}"))
+                    print(f"[migration] coluna adicionada: usuarios.{col}")
+
+            idx_rows = conn.execute(
+                text(
+                    """
+                    SELECT DISTINCT INDEX_NAME
+                    FROM INFORMATION_SCHEMA.STATISTICS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'usuarios'
+                      AND COLUMN_NAME = 'reset_senha_token_hash'
+                    """
+                )
+            ).all()
+            existing_idx = {r[0] for r in idx_rows}
+            if "ix_usuarios_reset_token" not in existing_idx:
+                try:
+                    conn.execute(
+                        text(
+                            "CREATE INDEX ix_usuarios_reset_token"
+                            " ON usuarios (reset_senha_token_hash)"
+                        )
+                    )
+                    print("[migration] índice criado: ix_usuarios_reset_token")
+                except SQLAlchemyError as exc:
+                    print(f"⚠️ Falha ao criar índice ix_usuarios_reset_token: {exc}")
+    except SQLAlchemyError as exc:
+        print(f"⚠️ Falha na migração automática de reset de senha: {exc}")
+
+
+_ensure_reset_senha_columns()
 
 
 # ============================================================================
@@ -1185,6 +1279,79 @@ def _delete_user_account(user_id: int) -> bool:
     except SQLAlchemyError as exc:
         print(f"⚠️ Erro ao anonimizar usuário {user_id}: {exc}")
         return False
+
+
+def _get_user_by_reset_token_hash(token_hash: str) -> dict | None:
+    if engine is None:
+        return None
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT id_usuario, email, reset_senha_token_hash, reset_senha_expira_em
+                FROM usuarios
+                WHERE reset_senha_token_hash = :token_hash
+                  AND ativo = 1
+                LIMIT 1
+                """
+            ),
+            {"token_hash": token_hash},
+        ).mappings().first()
+    return dict(row) if row else None
+
+
+def _set_reset_senha_token(user_id: int, token_hash: str, expira_em: datetime) -> None:
+    if engine is None:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                UPDATE usuarios
+                   SET reset_senha_token_hash = :token_hash,
+                       reset_senha_expira_em  = :expira_em
+                 WHERE id_usuario = :user_id
+                """
+            ),
+            {"token_hash": token_hash, "expira_em": expira_em, "user_id": int(user_id)},
+        )
+
+
+def _clear_reset_senha_token(user_id: int) -> None:
+    if engine is None:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                UPDATE usuarios
+                   SET reset_senha_token_hash = NULL,
+                       reset_senha_expira_em  = NULL
+                 WHERE id_usuario = :user_id
+                """
+            ),
+            {"user_id": int(user_id)},
+        )
+
+
+def _update_senha_hash(user_id: int, nova_senha_hash: str) -> None:
+    if engine is None:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE usuarios SET senha_hash = :hash WHERE id_usuario = :user_id"),
+            {"hash": nova_senha_hash, "user_id": int(user_id)},
+        )
+
+
+def _revoke_user_sessions(user_id: int) -> None:
+    if engine is None:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM sessoes WHERE usuario_id = :user_id"),
+            {"user_id": int(user_id)},
+        )
 
 
 def _get_valid_session_by_refresh_hash(refresh_token_hash: str) -> dict | None:
@@ -2024,6 +2191,73 @@ async def auth_reenviar_verificacao(payload: ReenvioVerificacaoRequest) -> dict:
     return mensagem_neutra
 
 
+@app.post(
+    "/v1/auth/recuperar-senha",
+    tags=["Auth"],
+    summary="Solicita link de recuperação de senha",
+    responses={200: {"description": "Solicitação processada (resposta neutra)."}},
+)
+async def auth_recuperar_senha(payload: RecuperarSenhaRequest) -> dict:
+    """Envia link de reset por e-mail. Resposta sempre neutra para evitar user enumeration."""
+    mensagem_neutra = {
+        "status": "ok",
+        "mensagem": "Se o e-mail estiver cadastrado, você receberá um link em breve.",
+    }
+
+    user = _get_user_by_email(payload.email)
+    if not user:
+        return mensagem_neutra
+
+    if int(user.get("ativo", 1)) == 0:
+        return mensagem_neutra
+
+    # Rate-limit: cooldown de 2 minutos (usa expira_em como âncora)
+    expira_em_atual = user.get("reset_senha_expira_em")
+    if expira_em_atual and expira_em_atual > datetime.utcnow() - timedelta(minutes=2):
+        return mensagem_neutra
+
+    token_plain = secrets.token_urlsafe(32)
+    token_hash = hash_token(token_plain)
+    expira_em = datetime.utcnow() + timedelta(minutes=15)
+
+    _set_reset_senha_token(int(user["id_usuario"]), token_hash, expira_em)
+
+    reset_link = f"{APP_BASE_URL}/reset-senha?token={token_plain}"
+    send_reset_senha_email(user["email"], reset_link)
+
+    return mensagem_neutra
+
+
+@app.post(
+    "/v1/auth/reset-senha",
+    tags=["Auth"],
+    summary="Redefine a senha via token de recuperação",
+    responses={
+        200: {"description": "Senha redefinida com sucesso."},
+        400: {"description": "Token inválido ou expirado."},
+        422: {"description": "Senhas não conferem ou não atendem aos critérios."},
+    },
+)
+async def auth_reset_senha(payload: ResetSenhaRequest) -> dict:
+    """Reset de senha. Token de uso único; todas as sessões são revogadas após uso."""
+    token_hash = hash_token(payload.token)
+    user = _get_user_by_reset_token_hash(token_hash)
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Token inválido ou expirado.")
+
+    expira_em = user.get("reset_senha_expira_em")
+    if not expira_em or expira_em <= datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Token inválido ou expirado.")
+
+    user_id = int(user["id_usuario"])
+    _update_senha_hash(user_id, hash_password(payload.nova_senha))
+    _clear_reset_senha_token(user_id)
+    _revoke_user_sessions(user_id)
+
+    return {"status": "senha_redefinida"}
+
+
 @app.post("/v1/auth/login", response_model=AuthResponse, tags=["Auth"])
 async def auth_login(payload: LoginRequest, request: Request):
     if engine is None:
@@ -2294,6 +2528,18 @@ async def serve_comparar():
 @app.get("/previsao", include_in_schema=False)
 async def serve_previsao():
     f = os.path.join(_STATIC_DIR, "previsao.html")
+    return FileResponse(f) if os.path.isfile(f) else Response(status_code=404)
+
+
+@app.get("/recuperar-senha", include_in_schema=False)
+async def serve_recuperar_senha():
+    f = os.path.join(_STATIC_DIR, "recuperar-senha.html")
+    return FileResponse(f) if os.path.isfile(f) else Response(status_code=404)
+
+
+@app.get("/reset-senha", include_in_schema=False)
+async def serve_reset_senha():
+    f = os.path.join(_STATIC_DIR, "reset-senha.html")
     return FileResponse(f) if os.path.isfile(f) else Response(status_code=404)
 
 

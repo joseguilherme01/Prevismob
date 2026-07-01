@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Recuperar senha — PrevIsmob</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="auth-main">
+      <div class="auth-card">
+        <div class="auth-card__header">
+          <h2>Recuperar senha</h2>
+          <p>Informe seu e-mail e enviaremos um link para criar uma nova senha.</p>
+        </div>
+
+        <form id="form-recuperar">
+          <div class="form-group">
+            <label class="form-label" for="email">E-mail</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              class="form-input"
+              style="padding-left: var(--sp-3)"
+              required
+              autocomplete="email"
+              placeholder="seu@email.com"
+            />
+          </div>
+          <button type="submit" class="btn btn--primary btn--full" id="btn-enviar">
+            Enviar link
+          </button>
+        </form>
+
+        <div
+          class="auth-info"
+          id="feedbackSucesso"
+          role="status"
+          style="display: none; margin-top: var(--sp-4); margin-bottom: 0"
+        >
+          <span class="auth-info__icon" aria-hidden="true">✓</span>
+          <span id="feedbackSucessoTexto"></span>
+        </div>
+        <div
+          id="feedbackErro"
+          role="alert"
+          style="
+            display: none;
+            margin-top: var(--sp-4);
+            background: var(--c-danger-bg);
+            border: 1px solid var(--c-danger);
+            border-radius: var(--radius-sm);
+            padding: var(--sp-3) var(--sp-4);
+            font-size: var(--text-sm);
+            color: var(--c-gray-800);
+          "
+        >
+          <span id="feedbackErroTexto"></span>
+        </div>
+
+        <div style="text-align: center; margin-top: var(--sp-5)">
+          <a href="/?aba=login" class="btn-link">← Voltar ao login</a>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const form = document.getElementById("form-recuperar");
+      const feedbackSucesso = document.getElementById("feedbackSucesso");
+      const feedbackSucessoTexto = document.getElementById("feedbackSucessoTexto");
+      const feedbackErro = document.getElementById("feedbackErro");
+      const feedbackErroTexto = document.getElementById("feedbackErroTexto");
+      const btnEnviar = document.getElementById("btn-enviar");
+
+      function mostrarSucesso(msg) {
+        feedbackSucessoTexto.textContent = msg;
+        feedbackSucesso.style.display = "";
+        feedbackErro.style.display = "none";
+      }
+
+      function mostrarErro(msg) {
+        feedbackErroTexto.textContent = msg;
+        feedbackErro.style.display = "block";
+        feedbackSucesso.style.display = "none";
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        feedbackSucesso.style.display = "none";
+        feedbackErro.style.display = "none";
+        btnEnviar.disabled = true;
+        btnEnviar.textContent = "Enviando…";
+
+        try {
+          await fetch("/v1/auth/recuperar-senha", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: document.getElementById("email").value.trim(),
+            }),
+          });
+          // Resposta sempre 200 (anti-enumeration)
+          mostrarSucesso(
+            "Se o e-mail estiver cadastrado, você receberá um link em breve. Verifique também sua caixa de spam.",
+          );
+          form.reset();
+        } catch {
+          mostrarErro("Erro de conexão. Tente novamente.");
+        } finally {
+          btnEnviar.disabled = false;
+          btnEnviar.textContent = "Enviar link";
+        }
+      });
+    </script>
+  </body>
+</html>

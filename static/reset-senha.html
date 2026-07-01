@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redefinir senha — PrevIsmob</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="auth-main">
+      <div class="auth-card">
+        <div class="auth-card__header">
+          <h2>Redefinir senha</h2>
+          <p>Crie uma nova senha para sua conta PrevIsmob.</p>
+        </div>
+
+        <form id="form-reset">
+          <div class="form-group">
+            <label class="form-label" for="nova_senha">Nova senha</label>
+            <input
+              type="password"
+              id="nova_senha"
+              name="nova_senha"
+              class="form-input"
+              style="padding-left: var(--sp-3)"
+              required
+              autocomplete="new-password"
+              placeholder="Mínimo 8 caracteres"
+            />
+            <span class="form-hint">Mínimo 8 caracteres, com pelo menos 1 letra e 1 número.</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="confirmar_senha">Confirmar nova senha</label>
+            <input
+              type="password"
+              id="confirmar_senha"
+              name="confirmar_senha"
+              class="form-input"
+              style="padding-left: var(--sp-3)"
+              required
+              autocomplete="new-password"
+              placeholder="Repita a senha"
+            />
+          </div>
+          <button type="submit" class="btn btn--primary btn--full" id="btn-redefinir">
+            Redefinir senha
+          </button>
+        </form>
+
+        <div
+          class="auth-info"
+          id="feedbackSucesso"
+          role="status"
+          style="display: none; margin-top: var(--sp-4); margin-bottom: 0"
+        >
+          <span class="auth-info__icon" aria-hidden="true">✓</span>
+          <span id="feedbackSucessoTexto"></span>
+        </div>
+        <div
+          id="feedbackErro"
+          role="alert"
+          style="
+            display: none;
+            margin-top: var(--sp-4);
+            background: var(--c-danger-bg);
+            border: 1px solid var(--c-danger);
+            border-radius: var(--radius-sm);
+            padding: var(--sp-3) var(--sp-4);
+            font-size: var(--text-sm);
+            color: var(--c-gray-800);
+          "
+        >
+          <span id="feedbackErroTexto"></span>
+        </div>
+
+        <div style="text-align: center; margin-top: var(--sp-5)">
+          <a href="/?aba=login" class="btn-link">← Voltar ao login</a>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const form = document.getElementById("form-reset");
+      const feedbackSucesso = document.getElementById("feedbackSucesso");
+      const feedbackSucessoTexto = document.getElementById("feedbackSucessoTexto");
+      const feedbackErro = document.getElementById("feedbackErro");
+      const feedbackErroTexto = document.getElementById("feedbackErroTexto");
+      const btnRedefinir = document.getElementById("btn-redefinir");
+
+      function getTokenFromUrl() {
+        return new URLSearchParams(window.location.search).get("token") || "";
+      }
+
+      function mostrarSucesso(msg) {
+        feedbackSucessoTexto.textContent = msg;
+        feedbackSucesso.style.display = "";
+        feedbackErro.style.display = "none";
+      }
+
+      function mostrarErro(msg) {
+        feedbackErroTexto.textContent = msg;
+        feedbackErro.style.display = "block";
+        feedbackSucesso.style.display = "none";
+      }
+
+      // Sem token na URL: exibe erro e oculta formulário imediatamente
+      if (!getTokenFromUrl()) {
+        mostrarErro("Link inválido ou expirado. Solicite um novo link de recuperação.");
+        form.style.display = "none";
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        feedbackSucesso.style.display = "none";
+        feedbackErro.style.display = "none";
+        btnRedefinir.disabled = true;
+        btnRedefinir.textContent = "Redefinindo…";
+
+        const nova_senha = document.getElementById("nova_senha").value;
+        const confirmar_senha = document.getElementById("confirmar_senha").value;
+
+        if (nova_senha !== confirmar_senha) {
+          mostrarErro("As senhas não coincidem.");
+          btnRedefinir.disabled = false;
+          btnRedefinir.textContent = "Redefinir senha";
+          return;
+        }
+
+        try {
+          const resp = await fetch("/v1/auth/reset-senha", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: getTokenFromUrl(), nova_senha, confirmar_senha }),
+          });
+
+          if (resp.ok) {
+            mostrarSucesso(
+              "Senha redefinida com sucesso! Você já pode fazer login com a nova senha.",
+            );
+            form.style.display = "none";
+          } else {
+            const data = await resp.json().catch(() => ({}));
+            mostrarErro(data.detail || "Token inválido ou expirado. Solicite um novo link.");
+          }
+        } catch {
+          mostrarErro("Erro de conexão. Tente novamente.");
+        } finally {
+          if (form.style.display !== "none") {
+            btnRedefinir.disabled = false;
+            btnRedefinir.textContent = "Redefinir senha";
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
