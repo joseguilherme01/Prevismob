@@ -503,7 +503,9 @@ if all([DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME]):
     try:
         db_user_enc = quote_plus(DB_USER)
         db_pass_enc = quote_plus(DB_PASSWORD)
-        DATABASE_URL = f"mysql+pymysql://{db_user_enc}:{db_pass_enc}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
+        is_local = DB_HOST in ("127.0.0.1", "localhost")
+        ssl_params = "" if is_local else "&ssl_verify_cert=true&ssl_verify_identity=true"
+        DATABASE_URL = f"mysql+pymysql://{db_user_enc}:{db_pass_enc}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4{ssl_params}"
         engine = create_engine(
             DATABASE_URL,
             pool_pre_ping=True,
