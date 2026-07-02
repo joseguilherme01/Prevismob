@@ -2546,6 +2546,18 @@ async def serve_reset_senha():
     return FileResponse(f) if os.path.isfile(f) else Response(status_code=404)
 
 
+@app.get("/config.js", include_in_schema=False)
+async def serve_config_js():
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    js = (
+        "window.PREVISMOB_CONFIG = {\n"
+        f'  GOOGLE_CLIENT_ID: "{client_id}",\n'
+        "  API_BASE: window.location.origin\n"
+        "};\n"
+    )
+    return PlainTextResponse(js, media_type="application/javascript")
+
+
 @app.get("/v1/condominio", response_model=List[str], tags=["Dados"])
 async def obter_condominio():
     """
